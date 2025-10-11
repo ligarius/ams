@@ -160,6 +160,77 @@ describe('API integration', () => {
     expect(overviewResponse.body.governance[0].owner).toBe('Laura Sponsor');
   });
 
+  it('returns 403 when client attempts to create a project', async () => {
+    const { accessToken } = await loginAdmin();
+    const clientEmail = 'client.forbidden@example.com';
+    const clientPassword = 'Client123!';
+
+    const createClientResponse = await request(app)
+      .post('/api/users')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ email: clientEmail, password: clientPassword, role: 'CLIENT' });
+    expect(createClientResponse.status).toBe(201);
+
+    const clientLogin = await request(app).post('/api/auth/login').send({
+      email: clientEmail,
+      password: clientPassword,
+    });
+    expect(clientLogin.status).toBe(200);
+
+    const projectResponse = await request(app)
+      .post('/api/projects')
+      .set('Authorization', `Bearer ${clientLogin.body.accessToken}`)
+      .send({ companyId: 1, name: 'Forbidden Project' });
+
+    expect(projectResponse.status).toBe(403);
+    expect(projectResponse.body.message).toBe('Insufficient permissions');
+  });
+
+  it('returns 403 when updating a project without membership', async () => {
+    const { accessToken } = await loginAdmin();
+
+    const projectResponse = await request(app)
+      .post('/api/projects')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ companyId: 1, name: 'Restricted Project' });
+    expect(projectResponse.status).toBe(201);
+
+    const outsiderEmail = 'outsider-update@example.com';
+    const outsiderPassword = 'Outsider123!';
+
+    const outsiderCreate = await request(app)
+      .post('/api/users')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ email: outsiderEmail, password: outsiderPassword, role: 'CONSULTANT' });
+    expect(outsiderCreate.status).toBe(201);
+
+    const outsiderLogin = await request(app).post('/api/auth/login').send({
+      email: outsiderEmail,
+      password: outsiderPassword,
+    });
+    expect(outsiderLogin.status).toBe(200);
+
+    const outsiderPatch = await request(app)
+      .patch(`/api/projects/${projectResponse.body.id}`)
+      .set('Authorization', `Bearer ${outsiderLogin.body.accessToken}`)
+      .send({ name: 'Updated Name' });
+
+    expect(outsiderPatch.status).toBe(403);
+    expect(outsiderPatch.body.message).toBe('Insufficient permissions');
+  });
+
+  it('returns 404 when updating a non-existent project', async () => {
+    const { accessToken } = await loginAdmin();
+
+    const response = await request(app)
+      .patch('/api/projects/9999')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ name: 'Ghost Project' });
+
+    expect(response.status).toBe(404);
+    expect(response.body.message).toBe('Project not found');
+  });
+
   it('returns 403 when requesting overview without membership', async () => {
     const { accessToken } = await loginAdmin();
     const projectResponse = await request(app)
