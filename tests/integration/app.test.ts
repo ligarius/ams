@@ -77,7 +77,7 @@ describe('API integration', () => {
     expect(patchResponse.body.role).toBe('CLIENT');
   });
 
-  it('allows project creation with role checks and audit logging', async () => {
+  it('allows project creation with role checks, wizard seeding and audit logging', async () => {
     const { accessToken, user } = await loginAdmin();
     const newMemberResponse = await request(app)
       .post('/api/users')
@@ -93,6 +93,25 @@ describe('API integration', () => {
         name: 'New Project',
         description: 'Initial audit project',
         members: [{ userId: newMemberResponse.body.id, role: 'CONSULTANT' }],
+        wizard: {
+          objectives: ['Objetivo personalizado'],
+          stakeholders: [
+            { name: 'Laura Sponsor', role: 'Sponsor Ejecutivo' },
+            { name: 'Equipo Operativo', role: 'Working Group Semanal' },
+          ],
+          milestones: [
+            { name: 'Inicio', dueDate: new Date('2024-05-01T10:00:00.000Z').toISOString() },
+            { name: 'Cierre', dueDate: new Date('2024-06-01T10:00:00.000Z').toISOString() },
+          ],
+          risks: [
+            {
+              title: 'Disponibilidad de recursos',
+              description: 'Rotación del equipo clave.',
+              likelihood: 'HIGH',
+              impact: 'MEDIUM',
+            },
+          ],
+        },
       });
     expect(response.status).toBe(201);
 
@@ -118,6 +137,9 @@ describe('API integration', () => {
     });
     expect(hasProjectCreatedLog).toBe(true);
 
+    const seedLogs = await prisma.auditLog.findMany({ where: { action: 'PROJECT_SEEDED' } });
+    expect(seedLogs.some((log) => log.metadata?.projectId === projectId)).toBe(true);
+
     const memberships = await prisma.membership.findMany({ where: { projectId } });
     const membershipSummary = memberships
       .map((membership) => ({ userId: membership.userId, role: membership.role }))
@@ -126,6 +148,42 @@ describe('API integration', () => {
       { userId: user.id, role: 'ADMIN' },
       { userId: newMemberResponse.body.id, role: 'CONSULTANT' },
     ]);
+
+    const overviewResponse = await request(app)
+      .get(`/api/projects/${projectId}/overview`)
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(overviewResponse.status).toBe(200);
+    expect(overviewResponse.body.project.name).toBe('New Project');
+    expect(overviewResponse.body.kpis).toHaveLength(3);
+    expect(overviewResponse.body.pendingChecklists[0].name).toBe('Inicio');
+    expect(overviewResponse.body.topRisks[0].title).toBe('Disponibilidad de recursos');
+    expect(overviewResponse.body.governance[0].owner).toBe('Laura Sponsor');
+  });
+
+  it('returns 403 when requesting overview without membership', async () => {
+    const { accessToken } = await loginAdmin();
+    const projectResponse = await request(app)
+      .post('/api/projects')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ companyId: 1, name: 'Proyecto sin acceso' });
+    expect(projectResponse.status).toBe(201);
+
+    const outsiderUser = await request(app)
+      .post('/api/users')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ email: 'outsider@example.com', password: 'Outsider123!', role: 'CONSULTANT' });
+    expect(outsiderUser.status).toBe(201);
+
+    const outsiderLogin = await request(app).post('/api/auth/login').send({
+      email: 'outsider@example.com',
+      password: 'Outsider123!',
+    });
+    expect(outsiderLogin.status).toBe(200);
+
+    const outsiderResponse = await request(app)
+      .get(`/api/projects/${projectResponse.body.id}/overview`)
+      .set('Authorization', `Bearer ${outsiderLogin.body.accessToken}`);
+    expect(outsiderResponse.status).toBe(403);
   });
 
   it('fails project creation when members include an unknown user', async () => {
