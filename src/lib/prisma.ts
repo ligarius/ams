@@ -303,6 +303,13 @@ class AuditLogModel {
     logOperation('auditLog', 'create', { id: logEntry.id, action: logEntry.action });
     return { ...logEntry };
   }
+
+  async findMany(params?: { where?: { action?: string } }): Promise<AuditLog[]> {
+    const { where } = params ?? {};
+    return state.auditLogs
+      .filter((log) => (where?.action ? log.action === where.action : true))
+      .map((log) => ({ ...log }));
+  }
 }
 
 class RefreshTokenModel {
