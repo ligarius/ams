@@ -3,16 +3,21 @@
 Este documento propone la descomposición del PRD en historias de usuario y tareas técnicas atómicas.
 Cada ticket incluye criterios de aceptación (CA) y checklist de QA.
 
-## Estado actual (Sprint 1 completado)
+## Estado actual (Sprint 1 completado, Sprint 2 en preparación)
 
-El alcance del Sprint 1 está entregado en la rama principal:
+- ✅ **Sprint 1** está liberado en la rama principal con autenticación robusta, CRUD de usuarios/compañías y middleware de seguridad completo.
+- 🛠️ **Sprint 2** se encuentra en fase de refinamiento. Las historias ya están detalladas y restan estimaciones finales con el equipo de frontend.
+- 📌 Se registran aquí los pendientes funcionales y técnicos que guían los siguientes incrementos.
 
-- Autenticación con control de intentos fallidos, expiración de bloqueos y registro en `AuditLog`.
-- CRUD de usuarios con permisos administrados por rol, validaciones Zod y auditoría de acciones.
-- CRUD de compañías/proyectos con restricciones por membresía, unicidad por compañía y logging.
-- Middleware y utilidades técnicas (Helmet, rate limiting, Pino, cabeceras anti-cache) más script `accept` y pruebas automatizadas cubriendo los flujos críticos.
+Los bloques del Sprint 1 permanecen como referencia histórica y sólo requieren atención ante regresiones.
 
-Los siguientes bloques quedan como referencia histórica del Sprint 1, pero no requieren más trabajo salvo regresiones.
+### Próximos entregables prioritarios
+
+| Historia | Estado | Notas |
+| --- | --- | --- |
+| Wizard de creación de auditoría | Refinado | Definir dependencias UI y contratos de API antes del grooming final. |
+| Seeds de estructura inicial | Refinado | Validar volumen inicial de datos con equipo funcional. |
+| Overview del proyecto | Pendiente | Alinear métricas clave y mocks de diseño. |
 
 ## Sprint 1 — Backend base ✅
 
