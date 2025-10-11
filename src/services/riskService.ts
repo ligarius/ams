@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import prisma, { DataRequest, Finding, ProjectRisk, RiskLevel, RiskStatus, User } from '@/lib/prisma';
+import prisma, { DataRequest, Finding, ProjectRisk, User } from '@/lib/prisma';
 import { ensureProjectAccess } from '@/services/projectService';
 
 const riskLevelSchema = z.enum(['LOW', 'MEDIUM', 'HIGH']);
