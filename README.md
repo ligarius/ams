@@ -1,6 +1,6 @@
-# AMS Backend Sprint 1
+# AMS Backend — MVP Auditoría
 
-Este repositorio contiene la base del backend para el MVP de Auditoría (Sprint 1), incluyendo la exposición del overview de proyectos con sus KPIs, checklists, riesgos y gobernanza.
+Este repositorio contiene la base del backend para el MVP de Auditoría. El Sprint 1 ya se encuentra entregado (autenticación, gestión de usuarios/compañías y middleware de seguridad) y el Sprint 2 está en preparación para habilitar el wizard de creación de auditorías y el overview completo del proyecto.
 
 ## Requisitos
 
@@ -35,7 +35,7 @@ npm install
 - `GET/POST/PATCH /api/projects`: CRUD de proyectos con control de membresías.
 - `GET /api/projects/:id/overview`: entrega KPIs, checklists, riesgos y gobernanza del proyecto.
 
-Todas las respuestas protegidas incluyen encabezados `Cache-Control: no-store`, `Pragma: no-cache` y `Expires: 0`. Helmet y rate limiting están configurados según los criterios de aceptación del sprint.
+Todas las respuestas protegidas incluyen encabezados `Cache-Control: no-store`, `Pragma: no-cache` y `Expires: 0`. Helmet y rate limiting están configurados según los criterios de aceptación del sprint. La definición completa de pendientes y roadmap se mantiene en [`docs/issues.md`](docs/issues.md).
 
 ## Datos iniciales
 
@@ -58,6 +58,8 @@ También se crea la compañía `Acme Corp` para las pruebas.
 
 > Consejo: durante el desarrollo puedes lanzar `npm run dev` en otra terminal para probar la API manualmente mientras ejecutas las pruebas.
 
-## Pruebas
+## Pruebas y QA
 
-Se incluyen pruebas unitarias para el servicio de autenticación y pruebas de integración que cubren los flujos críticos del sprint (login, bloqueo, gestión de usuarios, proyectos, overview de proyectos y refresh/logout). Ejecuta `npm run accept` para validar la calidad antes de desplegar.
+Se incluyen pruebas unitarias para el servicio de autenticación y pruebas de integración que cubren los flujos críticos del Sprint 1 (login, bloqueo, gestión de usuarios, proyectos, overview y refresh/logout). Ejecuta `npm run accept` para validar la calidad antes de desplegar.
+
+Para seguir el estado del roadmap y los nuevos criterios de aceptación en preparación, revisa la sección **Próximos entregables prioritarios** en [`docs/issues.md`](docs/issues.md).
