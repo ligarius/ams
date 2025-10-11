@@ -51,6 +51,8 @@ describe('API integration', () => {
     const listResponse = await request(app).get('/api/users').set('Authorization', `Bearer ${accessToken}`);
     expect(listResponse.status).toBe(200);
     expect(listResponse.headers['cache-control']).toBe('no-store');
+    expect(listResponse.headers['pragma']).toBe('no-cache');
+    expect(listResponse.headers['expires']).toBe('0');
     const createResponse = await request(app)
       .post('/api/users')
       .set('Authorization', `Bearer ${accessToken}`)
