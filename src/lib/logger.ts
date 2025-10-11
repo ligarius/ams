@@ -1,9 +1,12 @@
 import pino from 'pino';
 import env from '@/config/env';
 
+const isProduction = env.NODE_ENV === 'production';
+const isTest = env.NODE_ENV === 'test';
+
 const logger = pino({
-  level: env.NODE_ENV === 'production' ? 'info' : 'debug',
-  transport: env.NODE_ENV === 'production' ? undefined : {
+  level: isProduction ? 'info' : isTest ? 'silent' : 'debug',
+  transport: isProduction || isTest ? undefined : {
     target: 'pino-pretty',
     options: {
       colorize: true,
