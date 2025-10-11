@@ -36,24 +36,45 @@ export const createProject = async (payload: unknown, actor: User): Promise<Proj
   if (!company) {
     throw new Error('Company not found');
   }
-  const project = await prisma.project.create({
-    data: {
-      companyId: data.companyId,
-      name: data.name,
-      description: data.description,
-      createdById: actor.id,
-    },
-  });
-  await prisma.membership.create({ data: { projectId: project.id, userId: actor.id, role: actor.role } });
-  if (data.members) {
-    for (const member of data.members) {
-      if (member.userId === actor.id) {
-        continue;
-      }
-      await prisma.membership.create({ data: { projectId: project.id, userId: member.userId, role: member.role } });
+  const additionalMembers = (data.members ?? []).filter((member) => member.userId !== actor.id);
+  const memberMap = new Map<number, (typeof additionalMembers)[number]>();
+  for (const member of additionalMembers) {
+    if (!memberMap.has(member.userId)) {
+      memberMap.set(member.userId, member);
     }
   }
-  await prisma.auditLog.create({ data: { userId: actor.id, action: 'PROJECT_CREATED', metadata: { projectId: project.id } } });
+  for (const userId of memberMap.keys()) {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw new Error(`Member with id ${userId} not found`);
+    }
+  }
+
+  const project = await prisma.$transaction(async (tx) => {
+    const createdProject = await tx.project.create({
+      data: {
+        companyId: data.companyId,
+        name: data.name,
+        description: data.description,
+        createdById: actor.id,
+      },
+    });
+
+    await tx.membership.create({ data: { projectId: createdProject.id, userId: actor.id, role: actor.role } });
+
+    for (const member of memberMap.values()) {
+      await tx.membership.create({
+        data: { projectId: createdProject.id, userId: member.userId, role: member.role },
+      });
+    }
+
+    await tx.auditLog.create({
+      data: { userId: actor.id, action: 'PROJECT_CREATED', metadata: { projectId: createdProject.id } },
+    });
+
+    return createdProject;
+  });
+
   return project;
 };
 

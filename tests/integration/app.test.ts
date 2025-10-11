@@ -117,6 +117,28 @@ describe('API integration', () => {
     ]);
   });
 
+  it('fails project creation when members include an unknown user', async () => {
+    const { accessToken } = await loginAdmin();
+
+    const response = await request(app)
+      .post('/api/projects')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        companyId: 1,
+        name: 'Invalid Project',
+        members: [{ userId: 9999, role: 'CONSULTANT' }],
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.message).toContain('Member');
+
+    const projects = await prisma.project.findMany();
+    expect(projects).toHaveLength(0);
+
+    const memberships = await prisma.membership.findMany({ where: { projectId: 1 } });
+    expect(memberships).toHaveLength(0);
+  });
+
   it('refreshes tokens and logs out', async () => {
     const { accessToken, refreshToken } = await loginAdmin();
     const refreshResponse = await request(app).post('/api/auth/refresh').send({ refreshToken });
