@@ -120,7 +120,14 @@ describe('API integration', () => {
     const refreshResponse = await request(app).post('/api/auth/refresh').send({ refreshToken });
     expect(refreshResponse.status).toBe(200);
     expect(refreshResponse.body.accessToken).toBeDefined();
+    const refreshedRefreshToken = refreshResponse.body.refreshToken as string | undefined;
+    expect(refreshedRefreshToken).toBeDefined();
     const logoutResponse = await request(app).post('/api/auth/logout').set('Authorization', `Bearer ${accessToken}`);
     expect(logoutResponse.status).toBe(204);
+    const postLogoutRefreshResponse = await request(app)
+      .post('/api/auth/refresh')
+      .send({ refreshToken: refreshedRefreshToken });
+    expect(postLogoutRefreshResponse.status).toBe(401);
+    expect(postLogoutRefreshResponse.body.accessToken).toBeUndefined();
   });
 });
