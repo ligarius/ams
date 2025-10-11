@@ -39,6 +39,7 @@ npm install
 - `GET/POST/PATCH /api/projects/:id/risks`: alta y seguimiento de riesgos.
 - `GET/POST/PATCH /api/projects/:id/findings`: hallazgos vinculados a riesgos y solicitudes.
 - `GET/POST/PATCH /api/projects/:id/approvals`: aprobaciones de cambios de alcance con historial.
+- `GET /health`: endpoint liviano de observabilidad para verificaciones de uptime.
 
 Todas las respuestas protegidas incluyen encabezados `Cache-Control: no-store`, `Pragma: no-cache` y `Expires: 0`. Helmet y rate limiting están configurados según los criterios de aceptación del sprint. La definición completa de pendientes y roadmap se mantiene en [`docs/issues.md`](docs/issues.md).
 
@@ -66,5 +67,7 @@ También se crea la compañía `Acme Corp` para las pruebas.
 ## Pruebas y QA
 
 Se incluyen pruebas unitarias y de integración que cubren autenticación, overview, solicitudes de información, riesgos, hallazgos y aprobaciones. Ejecuta `npm run accept` para validar la calidad antes de desplegar.
+
+La última corrida de `npm test` (Jest con cobertura habilitada por defecto) reporta 77.8 % de *statements* y 77 % de líneas cubiertas, por lo que el foco inmediato del Sprint 4 es elevar especialmente los escenarios de rutas hasta superar el 80 % objetivo y publicar dichos reportes en CI.
 
 Para seguir el estado del roadmap y los nuevos criterios de aceptación en preparación, revisa la sección **Próximos entregables prioritarios** en [`docs/issues.md`](docs/issues.md).
