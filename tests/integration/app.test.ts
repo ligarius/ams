@@ -1,6 +1,6 @@
 import request from 'supertest';
 import { createApp } from '@/server';
-import { resetDatabase } from '@/lib/prisma';
+import prisma, { resetDatabase } from '@/lib/prisma';
 
 const app = createApp();
 
@@ -65,18 +65,54 @@ describe('API integration', () => {
   });
 
   it('allows project creation with role checks and audit logging', async () => {
-    const { accessToken } = await loginAdmin();
+    const { accessToken, user } = await loginAdmin();
+    const newMemberResponse = await request(app)
+      .post('/api/users')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ email: 'consultant@example.com', password: 'Consult123!', role: 'CONSULTANT' });
+    expect(newMemberResponse.status).toBe(201);
+
     const response = await request(app)
       .post('/api/projects')
       .set('Authorization', `Bearer ${accessToken}`)
-      .send({ companyId: 1, name: 'New Project', description: 'Initial audit project' });
+      .send({
+        companyId: 1,
+        name: 'New Project',
+        description: 'Initial audit project',
+        members: [{ userId: newMemberResponse.body.id, role: 'CONSULTANT' }],
+      });
     expect(response.status).toBe(201);
+
+    const projectId = response.body.id;
     const listResponse = await request(app)
       .get('/api/projects')
       .set('Authorization', `Bearer ${accessToken}`);
     expect(listResponse.status).toBe(200);
     expect(listResponse.body).toHaveLength(1);
     expect(listResponse.body[0].name).toBe('New Project');
+
+    const auditLogs = await prisma.auditLog.findMany({ where: { action: 'PROJECT_CREATED' } });
+    const hasProjectCreatedLog = auditLogs.some((log) => {
+      if (log.userId !== user.id) {
+        return false;
+      }
+      if (!log.metadata || typeof log.metadata !== 'object') {
+        return false;
+      }
+      const metadata = log.metadata as Record<string, unknown>;
+      const projectMetadata = metadata['projectId'];
+      return typeof projectMetadata === 'number' && projectMetadata === projectId;
+    });
+    expect(hasProjectCreatedLog).toBe(true);
+
+    const memberships = await prisma.membership.findMany({ where: { projectId } });
+    const membershipSummary = memberships
+      .map((membership) => ({ userId: membership.userId, role: membership.role }))
+      .sort((a, b) => a.userId - b.userId);
+    expect(membershipSummary).toEqual([
+      { userId: user.id, role: 'ADMIN' },
+      { userId: newMemberResponse.body.id, role: 'CONSULTANT' },
+    ]);
   });
 
   it('refreshes tokens and logs out', async () => {
