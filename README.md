@@ -1,6 +1,6 @@
 # AMS Backend — MVP Auditoría
 
-Este repositorio contiene la base del backend para el MVP de Auditoría. El Sprint 1 ya se encuentra entregado (autenticación, gestión de usuarios/compañías y middleware de seguridad) y el Sprint 2 también fue liberado: ahora el wizard de creación de auditorías siembra categorías, riesgos, checklists, KPIs y gobernanza inicial automáticamente y el overview consolida la información resultante con controles de permisos end-to-end.
+Este repositorio contiene la base del backend para el MVP de Auditoría. Los Sprint 1 y 2 están en producción con autenticación, gestión de usuarios/compañías, middleware de seguridad, wizard de creación y overview consolidado. Con el cierre del Sprint 3 añadimos la operación diaria: solicitudes de información con adjuntos, gestión de riesgos/hallazgos y aprobaciones de cambios de alcance.
 
 ## Requisitos
 
@@ -34,6 +34,11 @@ npm install
 - `GET/POST/PATCH /api/users`: gestión de usuarios (solo rol ADMIN).
 - `GET/POST/PATCH /api/projects`: CRUD de proyectos con control de membresías.
 - `GET /api/projects/:id/overview`: entrega KPIs, checklists, riesgos y gobernanza del proyecto.
+- `GET/POST/PATCH /api/projects/:id/data-requests`: gestión de solicitudes de información y su workflow de estados.
+- `POST/GET /api/projects/:id/data-requests/:dataRequestId/files`: adjuntos asociados a solicitudes.
+- `GET/POST/PATCH /api/projects/:id/risks`: alta y seguimiento de riesgos.
+- `GET/POST/PATCH /api/projects/:id/findings`: hallazgos vinculados a riesgos y solicitudes.
+- `GET/POST/PATCH /api/projects/:id/approvals`: aprobaciones de cambios de alcance con historial.
 
 Todas las respuestas protegidas incluyen encabezados `Cache-Control: no-store`, `Pragma: no-cache` y `Expires: 0`. Helmet y rate limiting están configurados según los criterios de aceptación del sprint. La definición completa de pendientes y roadmap se mantiene en [`docs/issues.md`](docs/issues.md).
 
@@ -60,6 +65,6 @@ También se crea la compañía `Acme Corp` para las pruebas.
 
 ## Pruebas y QA
 
-Se incluyen pruebas unitarias para el servicio de autenticación y pruebas de integración que cubren los flujos críticos del Sprint 1 (login, bloqueo, gestión de usuarios, proyectos, overview y refresh/logout). Ejecuta `npm run accept` para validar la calidad antes de desplegar.
+Se incluyen pruebas unitarias y de integración que cubren autenticación, overview, solicitudes de información, riesgos, hallazgos y aprobaciones. Ejecuta `npm run accept` para validar la calidad antes de desplegar.
 
 Para seguir el estado del roadmap y los nuevos criterios de aceptación en preparación, revisa la sección **Próximos entregables prioritarios** en [`docs/issues.md`](docs/issues.md).

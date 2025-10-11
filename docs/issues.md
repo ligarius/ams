@@ -3,23 +3,23 @@
 Este documento propone la descomposición del PRD en historias de usuario y tareas técnicas atómicas.
 Cada ticket incluye criterios de aceptación (CA) y checklist de QA.
 
-## Estado actual (Sprint 1 y 2 completados, Sprint 3 en preparación)
+## Estado actual (Sprint 1, 2 y 3 completados; Sprint 4 en preparación)
 
 - ✅ **Sprint 1** está liberado en la rama principal con autenticación robusta, CRUD de usuarios/compañías y middleware de seguridad completo.
 - ✅ **Sprint 2** fue entregado con el wizard de creación sembrando automáticamente categorías, riesgos, checklists, KPIs y gobernanza para nuevos proyectos, más el overview consolidado protegido por permisos.
-- 🛠️ **Sprint 3** se encuentra en refinamiento y concentra los próximos módulos operativos.
+- ✅ **Sprint 3** quedó cerrado con solicitudes de información (archivos incluidos), gestión integral de riesgos/hallazgos y flujos de aprobaciones.
 
-La tabla siguiente recoge los entregables inmediatos priorizados para Sprint 3.
+La tabla siguiente recoge los entregables inmediatos priorizados para Sprint 4.
 
-Los bloques de Sprints 1 y 2 permanecen como referencia histórica y sólo requieren atención ante regresiones.
+Los bloques de Sprints 1 a 3 permanecen como referencia histórica y sólo requieren atención ante regresiones.
 
 ### Próximos entregables prioritarios
 
 | Historia | Estado | Notas |
 | --- | --- | --- |
-| Data Requests con gestión de archivos | Refinado | Definir alcance de almacenamiento seguro y flujos de aprobación. |
-| Gestión de riesgos y hallazgos | Refinado | Consolidar reglas de negocio y dependencias de UI. |
-| Aprobaciones (Scope Change) | En discovery | Ajustar lineamientos de comité y eventos de auditoría. |
+| Cobertura de pruebas y métricas | Refinado | Elevar cobertura ≥80 % en servicios y publicar reportes en CI. |
+| Seguridad y observabilidad adicional | En discovery | Afinar CSP/Helmet, documentar plan de métricas y validar rate limiting. |
+| Preparación de despliegues MVP | Ideación | Definir playbook de ambientes y checklist de release. |
 
 ## Sprint 1 — Backend base ✅
 
@@ -115,20 +115,20 @@ Las tres historias del sprint se encuentran en producción y están cubiertas po
 - **QA**:
   - Pruebas de integración `tests/integration/app.test.ts` ejercitan el endpoint `/api/projects/:id/overview`, ordenan pendientes y riesgos y validan permisos ante usuarios sin membresía.
 
-## Sprint 3 — Módulos operativos
+## Sprint 3 — Módulos operativos ✅
 
 ### 3.1 Data Requests con gestión de archivos
 - **Historia**: Como cliente, quiero responder solicitudes.
 - **Tareas**:
-  - CRUD `/api/projects/:id/data-requests` con estados.
-  - Integración de subida de archivos con control de acceso.
+  - CRUD `/api/projects/:id/data-requests` con estados (`PENDING`, `IN_REVIEW`, `APPROVED`, `REJECTED`).
+  - Integración de subida de archivos con control de acceso (`POST/GET /files`).
   - UI `/projects/:id/data-requests` con filtros/acciones.
 - **CA**:
   - Estados permitidos: pendiente, en revisión, aprobada, rechazada.
   - Archivos sólo accesibles para miembros autorizados.
 - **QA**:
-  - Tests unitarios de flujo de estado.
-  - E2E: cliente sube evidencia; consultor aprueba.
+  - Tests unitarios de flujo de estado y validación de adjuntos.
+  - E2E: cliente sube evidencia; consultor aprueba (cubierto en `tests/integration/app.test.ts`).
 
 ### 3.2 Gestión de riesgos y hallazgos
 - **Historia**: Como consultor, quiero evaluar riesgos y hallazgos.
@@ -141,7 +141,7 @@ Las tres historias del sprint se encuentran en producción y están cubiertas po
   - Relacionar un hallazgo permite navegar a riesgo/solicitud.
 - **QA**:
   - Tests unitarios de relaciones.
-  - E2E: creación riesgo + hallazgo vinculado.
+  - E2E: creación riesgo + hallazgo vinculado (cubierto en `tests/integration/app.test.ts`).
 
 ### 3.3 Aprobaciones (Scope Change)
 - **Historia**: Como comité, quiero aprobar cambios de alcance.
@@ -153,7 +153,7 @@ Las tres historias del sprint se encuentran en producción y están cubiertas po
   - Eventos guardados en AuditLog con usuario y timestamp.
 - **QA**:
   - Tests unitarios de reglas de aprobación.
-  - E2E: crear aprobación y aprobar/rechazar.
+  - E2E: crear aprobación y aprobar/rechazar (cubierto en `tests/integration/app.test.ts`).
 
 ## Sprint 4 — Hardening y calidad
 
