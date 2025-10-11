@@ -137,7 +137,12 @@ const logOperation = (model: string, action: string, payload: unknown) => {
 class UserModel {
   async findUnique(params: { where: { id?: number; email?: string } }): Promise<User | null> {
     const { id, email } = params.where;
-    const user = state.users.find((item) => (id ? item.id === id : true) && (email ? item.email === email : true));
+    const user = state.users.find((item) => {
+      const hasValidId = id !== undefined && !Number.isNaN(id);
+      const matchesId = hasValidId ? item.id === id : true;
+      const matchesEmail = email !== undefined ? item.email === email : true;
+      return matchesId && matchesEmail;
+    });
     return user ?? null;
   }
 

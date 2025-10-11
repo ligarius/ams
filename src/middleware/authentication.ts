@@ -18,7 +18,12 @@ export const authenticate = async (req: AuthenticatedRequest, res: Response, nex
 
   try {
     const payload = verifyAccessToken(token);
-    const user = await prisma.user.findUnique({ where: { id: Number(payload.sub) } });
+    const userId = Number.parseInt(payload.sub, 10);
+    const isValidUserId = Number.isSafeInteger(userId) && userId > 0;
+    if (!isValidUserId) {
+      return res.status(401).json({ message: 'Invalid or expired token' });
+    }
+    const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
       return res.status(401).json({ message: 'User not found' });
     }

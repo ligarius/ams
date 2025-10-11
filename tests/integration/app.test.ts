@@ -1,6 +1,7 @@
 import request from 'supertest';
 import { createApp } from '@/server';
 import prisma, { resetDatabase } from '@/lib/prisma';
+import { signAccessToken } from '@/utils/token';
 
 const app = createApp();
 
@@ -43,6 +44,16 @@ describe('API integration', () => {
 
   it('requires authentication for user list', async () => {
     const response = await request(app).get('/api/users');
+    expect(response.status).toBe(401);
+  });
+
+  it.each([
+    ['0'],
+    [''],
+    ['not-a-number'],
+  ])('rejects token with invalid numeric sub value %p', async (subject) => {
+    const token = signAccessToken({ sub: subject, role: 'ADMIN' });
+    const response = await request(app).get('/api/users').set('Authorization', `Bearer ${token}`);
     expect(response.status).toBe(401);
   });
 
