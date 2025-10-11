@@ -511,4 +511,102 @@ describe('API integration', () => {
     ]);
     expect(logs.some((log) => log.metadata?.dataRequestId === dataRequestId && log.metadata?.status === 'APPROVED')).toBe(true);
   });
+
+  it('serves Prometheus metrics and handles unknown routes securely', async () => {
+    const metricsResponse = await request(app).get('/metrics');
+    expect(metricsResponse.status).toBe(200);
+    const metricsContentType = metricsResponse.headers['content-type'];
+    expect(metricsContentType).toBeDefined();
+    expect(metricsContentType).toContain('text/plain');
+    expect(metricsContentType).toContain('version=0.0.4');
+    expect(metricsResponse.text).toContain('ams_users_total');
+
+    const notFoundResponse = await request(app).get('/totally-unknown-route');
+    expect(notFoundResponse.status).toBe(404);
+    expect(notFoundResponse.body).toEqual({ message: 'Not found' });
+  });
+
+  it('guards data request routes against malformed identifiers and payloads', async () => {
+    const { accessToken } = await loginAdmin();
+
+    const invalidIdentifierResponse = await request(app)
+      .get('/api/projects/not-a-number/data-requests')
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(invalidIdentifierResponse.status).toBe(400);
+    expect(invalidIdentifierResponse.body.message).toBe('Invalid project id');
+
+    const projectResponse = await request(app)
+      .post('/api/projects')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ companyId: 1, name: 'Proyecto para validaciones' });
+    expect(projectResponse.status).toBe(201);
+    const projectId = projectResponse.body.id as number;
+
+    const invalidStatusResponse = await request(app)
+      .get(`/api/projects/${projectId}/data-requests`)
+      .query({ status: 'UNKNOWN' })
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(invalidStatusResponse.status).toBe(400);
+    expect(invalidStatusResponse.body.message).toBe('Invalid status filter');
+
+    const outsiderResponse = await request(app)
+      .post('/api/users')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ email: 'external@example.com', password: 'External123!', role: 'CONSULTANT' });
+    expect(outsiderResponse.status).toBe(201);
+
+    const unauthorizedAssignment = await request(app)
+      .post(`/api/projects/${projectId}/data-requests`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ title: 'Solicitud inválida', assignedToId: outsiderResponse.body.id });
+    expect(unauthorizedAssignment.status).toBe(400);
+    expect(unauthorizedAssignment.body.message).toBe('Assigned user is not part of the project');
+
+    const createResponse = await request(app)
+      .post(`/api/projects/${projectId}/data-requests`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ title: 'Documentación inicial' });
+    expect(createResponse.status).toBe(201);
+    const dataRequestId = createResponse.body.id as number;
+
+    const invalidTransition = await request(app)
+      .patch(`/api/projects/${projectId}/data-requests/${dataRequestId}`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ status: 'APPROVED' });
+    expect(invalidTransition.status).toBe(400);
+    expect(invalidTransition.body.message).toBe('Invalid status transition');
+
+    const transitionResponse = await request(app)
+      .patch(`/api/projects/${projectId}/data-requests/${dataRequestId}`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ status: 'IN_REVIEW' });
+    expect(transitionResponse.status).toBe(200);
+    expect(transitionResponse.body.status).toBe('IN_REVIEW');
+
+    const invalidAttachmentResponse = await request(app)
+      .post(`/api/projects/${projectId}/data-requests/${dataRequestId}/files`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ fileName: '' });
+    expect(invalidAttachmentResponse.status).toBe(400);
+    expect(invalidAttachmentResponse.body.message).toBe('Invalid payload');
+
+    const attachmentResponse = await request(app)
+      .post(`/api/projects/${projectId}/data-requests/${dataRequestId}/files`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ fileName: 'evidencia.txt', content: 'Detalle del control' });
+    expect(attachmentResponse.status).toBe(201);
+
+    const attachmentsList = await request(app)
+      .get(`/api/projects/${projectId}/data-requests/${dataRequestId}/files`)
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(attachmentsList.status).toBe(200);
+    expect(Array.isArray(attachmentsList.body)).toBe(true);
+    expect(attachmentsList.body[0].fileName).toBe('evidencia.txt');
+
+    const missingRequestAttachments = await request(app)
+      .get(`/api/projects/${projectId}/data-requests/999/files`)
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(missingRequestAttachments.status).toBe(404);
+    expect(missingRequestAttachments.body.message).toBe('Data request not found');
+  });
 });

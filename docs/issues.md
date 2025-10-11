@@ -18,8 +18,8 @@ Los bloques de Sprints 1 a 3 permanecen como referencia histórica y sólo requi
 
 | Historia | Estado | Notas |
 | --- | --- | --- |
-| Cobertura de pruebas y métricas | En progreso | Cobertura global actual 77 % líneas; falta elevar rutas al ≥80 % y documentar export de reportes en CI. |
-| Seguridad y observabilidad adicional | Discovery | Afinar CSP/Helmet, documentar plan de métricas y validar rate limiting. |
+| Cobertura de pruebas y métricas | ✅ Completado | Cobertura global 81 %+ de líneas/statements; reportes `coverage/` listos para publicarse en CI y documentados en README. |
+| Seguridad y observabilidad adicional | ✅ Completado | CSP reforzada, `/metrics` expone conteos en formato Prometheus y rate limiting responde con mensaje controlado. |
 | Preparación de despliegues MVP | Ideación | Definir playbook de ambientes y checklist de release. |
 
 ## Sprint 1 — Backend base ✅
