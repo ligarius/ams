@@ -351,4 +351,164 @@ describe('API integration', () => {
     expect(postLogoutRefreshResponse.status).toBe(401);
     expect(postLogoutRefreshResponse.body.accessToken).toBeUndefined();
   });
+
+  it('supports the sprint 3 operational flow across data requests, risks, findings and approvals', async () => {
+    const { accessToken: adminToken, user: adminUser } = await loginAdmin();
+
+    const consultantResponse = await request(app)
+      .post('/api/users')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ email: 's3.consultant@example.com', password: 'Consult123!', role: 'CONSULTANT' });
+    expect(consultantResponse.status).toBe(201);
+
+    const clientResponse = await request(app)
+      .post('/api/users')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ email: 's3.client@example.com', password: 'Client123!', role: 'CLIENT' });
+    expect(clientResponse.status).toBe(201);
+
+    const projectResponse = await request(app)
+      .post('/api/projects')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        companyId: 1,
+        name: 'Sprint 3 Project',
+        members: [
+          { userId: consultantResponse.body.id, role: 'CONSULTANT' },
+          { userId: clientResponse.body.id, role: 'CLIENT' },
+        ],
+      });
+    expect(projectResponse.status).toBe(201);
+    const projectId = projectResponse.body.id as number;
+
+    const consultantLogin = await request(app).post('/api/auth/login').send({
+      email: 's3.consultant@example.com',
+      password: 'Consult123!',
+    });
+    expect(consultantLogin.status).toBe(200);
+    const consultantToken = consultantLogin.body.accessToken as string;
+
+    const clientLogin = await request(app).post('/api/auth/login').send({
+      email: 's3.client@example.com',
+      password: 'Client123!',
+    });
+    expect(clientLogin.status).toBe(200);
+    const clientToken = clientLogin.body.accessToken as string;
+
+    const dataRequestResponse = await request(app)
+      .post(`/api/projects/${projectId}/data-requests`)
+      .set('Authorization', `Bearer ${consultantToken}`)
+      .send({
+        title: 'Evidencia de controles',
+        description: 'Subir reportes del Q1',
+        dueDate: new Date('2024-05-05T10:00:00Z').toISOString(),
+      });
+    expect(dataRequestResponse.status).toBe(201);
+    const dataRequestId = dataRequestResponse.body.id as number;
+    expect(dataRequestResponse.body.status).toBe('PENDING');
+
+    const attachmentResponse = await request(app)
+      .post(`/api/projects/${projectId}/data-requests/${dataRequestId}/files`)
+      .set('Authorization', `Bearer ${clientToken}`)
+      .send({ fileName: 'evidencia.pdf', content: 'base64content' });
+    expect(attachmentResponse.status).toBe(201);
+    expect(attachmentResponse.body.fileName).toBe('evidencia.pdf');
+
+    const forbiddenClientUpdate = await request(app)
+      .patch(`/api/projects/${projectId}/data-requests/${dataRequestId}`)
+      .set('Authorization', `Bearer ${clientToken}`)
+      .send({ title: 'Cambio no permitido' });
+    expect(forbiddenClientUpdate.status).toBe(403);
+
+    const reviewResponse = await request(app)
+      .patch(`/api/projects/${projectId}/data-requests/${dataRequestId}`)
+      .set('Authorization', `Bearer ${clientToken}`)
+      .send({ status: 'IN_REVIEW' });
+    expect(reviewResponse.status).toBe(200);
+    expect(reviewResponse.body.status).toBe('IN_REVIEW');
+
+    const approveResponse = await request(app)
+      .patch(`/api/projects/${projectId}/data-requests/${dataRequestId}`)
+      .set('Authorization', `Bearer ${consultantToken}`)
+      .send({ status: 'APPROVED' });
+    expect(approveResponse.status).toBe(200);
+    expect(approveResponse.body.status).toBe('APPROVED');
+    expect(Array.isArray(approveResponse.body.attachments)).toBe(true);
+    expect(approveResponse.body.attachments).toHaveLength(1);
+
+    const riskResponse = await request(app)
+      .post(`/api/projects/${projectId}/risks`)
+      .set('Authorization', `Bearer ${consultantToken}`)
+      .send({
+        title: 'Dependencia de evidencia',
+        description: 'Riesgo por retrasos en cargas',
+        likelihood: 'MEDIUM',
+        severity: 'HIGH',
+        dataRequestId,
+      });
+    expect(riskResponse.status).toBe(201);
+    const riskId = riskResponse.body.id as number;
+    expect(riskResponse.body.dataRequest.id).toBe(dataRequestId);
+
+    const findingResponse = await request(app)
+      .post(`/api/projects/${projectId}/findings`)
+      .set('Authorization', `Bearer ${consultantToken}`)
+      .send({
+        riskId,
+        dataRequestId,
+        title: 'Hallazgo de demora',
+        description: 'Se detectaron retrasos recurrentes en la entrega',
+      });
+    expect(findingResponse.status).toBe(201);
+    const findingId = findingResponse.body.id as number;
+    expect(findingResponse.body.dataRequest.id).toBe(dataRequestId);
+
+    const findingResolution = await request(app)
+      .patch(`/api/projects/${projectId}/findings/${findingId}`)
+      .set('Authorization', `Bearer ${consultantToken}`)
+      .send({ status: 'RESOLVED' });
+    expect(findingResolution.status).toBe(200);
+    expect(findingResolution.body.status).toBe('RESOLVED');
+
+    const approvalsEmpty = await request(app)
+      .get(`/api/projects/${projectId}/approvals`)
+      .set('Authorization', `Bearer ${clientToken}`);
+    expect(approvalsEmpty.status).toBe(200);
+    expect(approvalsEmpty.body).toHaveLength(0);
+
+    const approvalCreate = await request(app)
+      .post(`/api/projects/${projectId}/approvals`)
+      .set('Authorization', `Bearer ${consultantToken}`)
+      .send({ title: 'Cambio de alcance', description: 'Extender revisión a planta adicional' });
+    expect(approvalCreate.status).toBe(201);
+    const approvalId = approvalCreate.body.id as number;
+    expect(approvalCreate.body.status).toBe('PENDING');
+
+    const invalidTransition = await request(app)
+      .patch(`/api/projects/${projectId}/approvals/${approvalId}`)
+      .set('Authorization', `Bearer ${consultantToken}`)
+      .send({ status: 'PENDING' });
+    expect(invalidTransition.status).toBe(400);
+
+    const approvalDecision = await request(app)
+      .patch(`/api/projects/${projectId}/approvals/${approvalId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ status: 'APPROVED', comment: 'Avalado por comité' });
+    expect(approvalDecision.status).toBe(200);
+    expect(approvalDecision.body.status).toBe('APPROVED');
+    expect(approvalDecision.body.decidedById).toBe(adminUser.id);
+
+    const listResponse = await request(app)
+      .get(`/api/projects/${projectId}/data-requests`)
+      .set('Authorization', `Bearer ${consultantToken}`)
+      .query({ status: 'APPROVED' });
+    expect(listResponse.status).toBe(200);
+    expect(listResponse.body).toHaveLength(1);
+    expect(listResponse.body[0].attachments).toHaveLength(1);
+
+    const [logs] = await Promise.all([
+      prisma.auditLog.findMany({ where: { action: 'DATA_REQUEST_UPDATED' } }),
+    ]);
+    expect(logs.some((log) => log.metadata?.dataRequestId === dataRequestId && log.metadata?.status === 'APPROVED')).toBe(true);
+  });
 });

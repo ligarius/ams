@@ -61,6 +61,9 @@ export type RiskStatus = 'OPEN' | 'IN_PROGRESS' | 'RESOLVED';
 export type ChecklistStatus = 'PENDING' | 'COMPLETED';
 export type GovernanceCadence = 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'AD_HOC';
 export type GovernanceType = 'STEERING_COMMITTEE' | 'WORKING_GROUP' | 'SPONSOR_CHECKIN';
+export type DataRequestStatus = 'PENDING' | 'IN_REVIEW' | 'APPROVED' | 'REJECTED';
+export type FindingStatus = 'OPEN' | 'IN_REVIEW' | 'RESOLVED';
+export type ApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 
 export interface ProjectCategory {
   id: number;
@@ -79,6 +82,9 @@ export interface ProjectRisk {
   severity: RiskLevel;
   likelihood: RiskLevel;
   status: RiskStatus;
+  process: string | null;
+  system: string | null;
+  dataRequestId: number | null;
   createdAt: Date;
 }
 
@@ -113,6 +119,54 @@ export interface GovernanceEvent {
   createdAt: Date;
 }
 
+export interface DataRequest {
+  id: number;
+  projectId: number;
+  title: string;
+  description: string | null;
+  dueDate: Date | null;
+  status: DataRequestStatus;
+  createdById: number;
+  assignedToId: number | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface DataRequestAttachment {
+  id: number;
+  dataRequestId: number;
+  fileName: string;
+  content: string;
+  uploadedById: number;
+  uploadedAt: Date;
+}
+
+export interface Finding {
+  id: number;
+  projectId: number;
+  riskId: number;
+  dataRequestId: number | null;
+  title: string;
+  description: string | null;
+  status: FindingStatus;
+  createdById: number;
+  updatedAt: Date;
+  createdAt: Date;
+}
+
+export interface Approval {
+  id: number;
+  projectId: number;
+  title: string;
+  description: string | null;
+  status: ApprovalStatus;
+  createdById: number;
+  decidedById: number | null;
+  decidedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 interface DatabaseState {
   users: User[];
   companies: Company[];
@@ -125,6 +179,10 @@ interface DatabaseState {
   projectChecklists: ProjectChecklist[];
   projectKpis: ProjectKpi[];
   governanceEvents: GovernanceEvent[];
+  dataRequests: DataRequest[];
+  dataRequestAttachments: DataRequestAttachment[];
+  findings: Finding[];
+  approvals: Approval[];
   sequences: Record<string, number>;
 }
 
@@ -140,6 +198,10 @@ const state: DatabaseState = {
   projectChecklists: [],
   projectKpis: [],
   governanceEvents: [],
+  dataRequests: [],
+  dataRequestAttachments: [],
+  findings: [],
+  approvals: [],
   sequences: {},
 };
 
@@ -196,6 +258,10 @@ const resetState = () => {
   state.projectChecklists = [];
   state.projectKpis = [];
   state.governanceEvents = [];
+  state.dataRequests = [];
+  state.dataRequestAttachments = [];
+  state.findings = [];
+  state.approvals = [];
   state.sequences = {};
   seed();
 };
@@ -410,6 +476,9 @@ class ProjectRiskModel {
       severity: RiskLevel;
       likelihood: RiskLevel;
       status?: RiskStatus;
+      process?: string | null;
+      system?: string | null;
+      dataRequestId?: number | null;
     };
   }): Promise<ProjectRisk> {
     const risk: ProjectRisk = {
@@ -421,10 +490,54 @@ class ProjectRiskModel {
       severity: params.data.severity,
       likelihood: params.data.likelihood,
       status: params.data.status ?? 'OPEN',
+      process: params.data.process ?? null,
+      system: params.data.system ?? null,
+      dataRequestId: params.data.dataRequestId ?? null,
       createdAt: now(),
     };
     state.projectRisks.push(risk);
     logOperation('projectRisk', 'create', { id: risk.id, projectId: risk.projectId });
+    return { ...risk };
+  }
+
+  async findUnique(params: { where: { id: number } }): Promise<ProjectRisk | null> {
+    const risk = state.projectRisks.find((item) => item.id === params.where.id);
+    return risk ? { ...risk } : null;
+  }
+
+  async update(params: {
+    where: { id: number };
+    data: Partial<Pick<ProjectRisk, 'title' | 'description' | 'severity' | 'likelihood' | 'status' | 'process' | 'system' | 'dataRequestId'>>;
+  }): Promise<ProjectRisk> {
+    const risk = state.projectRisks.find((item) => item.id === params.where.id);
+    if (!risk) {
+      throw new Error('Risk not found');
+    }
+    if (params.data.title !== undefined) {
+      risk.title = params.data.title;
+    }
+    if (params.data.description !== undefined) {
+      risk.description = params.data.description;
+    }
+    if (params.data.severity !== undefined) {
+      risk.severity = params.data.severity;
+    }
+    if (params.data.likelihood !== undefined) {
+      risk.likelihood = params.data.likelihood;
+    }
+    if (params.data.status !== undefined) {
+      risk.status = params.data.status;
+    }
+    if (params.data.process !== undefined) {
+      risk.process = params.data.process;
+    }
+    if (params.data.system !== undefined) {
+      risk.system = params.data.system;
+    }
+    if (params.data.dataRequestId !== undefined) {
+      risk.dataRequestId = params.data.dataRequestId;
+    }
+    logOperation('projectRisk', 'update', { id: risk.id });
     return { ...risk };
   }
 }
@@ -508,6 +621,239 @@ class GovernanceEventModel {
   }
 }
 
+class DataRequestModel {
+  async findMany(params: { where: { projectId?: number; status?: DataRequestStatus } }): Promise<DataRequest[]> {
+    const { where } = params;
+    return state.dataRequests
+      .filter((request) => (where.projectId ? request.projectId === where.projectId : true))
+      .filter((request) => (where.status ? request.status === where.status : true))
+      .map((request) => ({ ...request }));
+  }
+
+  async findUnique(params: { where: { id: number } }): Promise<DataRequest | null> {
+    const request = state.dataRequests.find((item) => item.id === params.where.id);
+    return request ? { ...request } : null;
+  }
+
+  async create(params: {
+    data: {
+      projectId: number;
+      title: string;
+      description?: string | null;
+      dueDate?: Date | null;
+      status?: DataRequestStatus;
+      createdById: number;
+      assignedToId?: number | null;
+    };
+  }): Promise<DataRequest> {
+    const timestamp = now();
+    const dataRequest: DataRequest = {
+      id: nextId('dataRequests'),
+      projectId: params.data.projectId,
+      title: params.data.title,
+      description: params.data.description ?? null,
+      dueDate: params.data.dueDate ?? null,
+      status: params.data.status ?? 'PENDING',
+      createdById: params.data.createdById,
+      assignedToId: params.data.assignedToId ?? null,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+    state.dataRequests.push(dataRequest);
+    logOperation('dataRequest', 'create', { id: dataRequest.id, projectId: dataRequest.projectId });
+    return { ...dataRequest };
+  }
+
+  async update(params: {
+    where: { id: number };
+    data: Partial<Pick<DataRequest, 'title' | 'description' | 'dueDate' | 'status' | 'assignedToId'>>;
+  }): Promise<DataRequest> {
+    const dataRequest = state.dataRequests.find((item) => item.id === params.where.id);
+    if (!dataRequest) {
+      throw new Error('Data request not found');
+    }
+    if (params.data.title !== undefined) {
+      dataRequest.title = params.data.title;
+    }
+    if (params.data.description !== undefined) {
+      dataRequest.description = params.data.description;
+    }
+    if (params.data.dueDate !== undefined) {
+      dataRequest.dueDate = params.data.dueDate;
+    }
+    if (params.data.status !== undefined) {
+      dataRequest.status = params.data.status;
+    }
+    if (params.data.assignedToId !== undefined) {
+      dataRequest.assignedToId = params.data.assignedToId;
+    }
+    dataRequest.updatedAt = now();
+    logOperation('dataRequest', 'update', { id: dataRequest.id });
+    return { ...dataRequest };
+  }
+}
+
+class DataRequestAttachmentModel {
+  async findMany(params: { where: { dataRequestId: number } }): Promise<DataRequestAttachment[]> {
+    return state.dataRequestAttachments
+      .filter((attachment) => attachment.dataRequestId === params.where.dataRequestId)
+      .map((attachment) => ({ ...attachment }));
+  }
+
+  async create(params: {
+    data: { dataRequestId: number; fileName: string; content: string; uploadedById: number };
+  }): Promise<DataRequestAttachment> {
+    const attachment: DataRequestAttachment = {
+      id: nextId('dataRequestAttachments'),
+      dataRequestId: params.data.dataRequestId,
+      fileName: params.data.fileName,
+      content: params.data.content,
+      uploadedById: params.data.uploadedById,
+      uploadedAt: now(),
+    };
+    state.dataRequestAttachments.push(attachment);
+    logOperation('dataRequestAttachment', 'create', { id: attachment.id, dataRequestId: attachment.dataRequestId });
+    return { ...attachment };
+  }
+}
+
+class FindingModel {
+  async findMany(params: { where: { projectId?: number; riskId?: number } }): Promise<Finding[]> {
+    const { where } = params;
+    return state.findings
+      .filter((finding) => (where.projectId ? finding.projectId === where.projectId : true))
+      .filter((finding) => (where.riskId ? finding.riskId === where.riskId : true))
+      .map((finding) => ({ ...finding }));
+  }
+
+  async findUnique(params: { where: { id: number } }): Promise<Finding | null> {
+    const finding = state.findings.find((item) => item.id === params.where.id);
+    return finding ? { ...finding } : null;
+  }
+
+  async create(params: {
+    data: {
+      projectId: number;
+      riskId: number;
+      dataRequestId?: number | null;
+      title: string;
+      description?: string | null;
+      status?: FindingStatus;
+      createdById: number;
+    };
+  }): Promise<Finding> {
+    const timestamp = now();
+    const finding: Finding = {
+      id: nextId('findings'),
+      projectId: params.data.projectId,
+      riskId: params.data.riskId,
+      dataRequestId: params.data.dataRequestId ?? null,
+      title: params.data.title,
+      description: params.data.description ?? null,
+      status: params.data.status ?? 'OPEN',
+      createdById: params.data.createdById,
+      updatedAt: timestamp,
+      createdAt: timestamp,
+    };
+    state.findings.push(finding);
+    logOperation('finding', 'create', { id: finding.id, projectId: finding.projectId });
+    return { ...finding };
+  }
+
+  async update(params: {
+    where: { id: number };
+    data: Partial<Pick<Finding, 'title' | 'description' | 'status' | 'dataRequestId'>>;
+  }): Promise<Finding> {
+    const finding = state.findings.find((item) => item.id === params.where.id);
+    if (!finding) {
+      throw new Error('Finding not found');
+    }
+    if (params.data.title !== undefined) {
+      finding.title = params.data.title;
+    }
+    if (params.data.description !== undefined) {
+      finding.description = params.data.description;
+    }
+    if (params.data.status !== undefined) {
+      finding.status = params.data.status;
+    }
+    if (params.data.dataRequestId !== undefined) {
+      finding.dataRequestId = params.data.dataRequestId;
+    }
+    finding.updatedAt = now();
+    logOperation('finding', 'update', { id: finding.id });
+    return { ...finding };
+  }
+}
+
+class ApprovalModel {
+  async findMany(params: { where: { projectId: number } }): Promise<Approval[]> {
+    return state.approvals
+      .filter((approval) => approval.projectId === params.where.projectId)
+      .map((approval) => ({ ...approval }));
+  }
+
+  async findUnique(params: { where: { id: number } }): Promise<Approval | null> {
+    const approval = state.approvals.find((item) => item.id === params.where.id);
+    return approval ? { ...approval } : null;
+  }
+
+  async create(params: {
+    data: {
+      projectId: number;
+      title: string;
+      description?: string | null;
+      status?: ApprovalStatus;
+      createdById: number;
+    };
+  }): Promise<Approval> {
+    const timestamp = now();
+    const approval: Approval = {
+      id: nextId('approvals'),
+      projectId: params.data.projectId,
+      title: params.data.title,
+      description: params.data.description ?? null,
+      status: params.data.status ?? 'PENDING',
+      createdById: params.data.createdById,
+      decidedById: null,
+      decidedAt: null,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+    state.approvals.push(approval);
+    logOperation('approval', 'create', { id: approval.id, projectId: approval.projectId });
+    return { ...approval };
+  }
+
+  async update(params: {
+    where: { id: number };
+    data: Partial<Pick<Approval, 'title' | 'description' | 'status' | 'decidedById' | 'decidedAt'>>;
+  }): Promise<Approval> {
+    const approval = state.approvals.find((item) => item.id === params.where.id);
+    if (!approval) {
+      throw new Error('Approval not found');
+    }
+    if (params.data.title !== undefined) {
+      approval.title = params.data.title;
+    }
+    if (params.data.description !== undefined) {
+      approval.description = params.data.description;
+    }
+    if (params.data.status !== undefined) {
+      approval.status = params.data.status;
+    }
+    if (params.data.decidedById !== undefined) {
+      approval.decidedById = params.data.decidedById;
+    }
+    if (params.data.decidedAt !== undefined) {
+      approval.decidedAt = params.data.decidedAt;
+    }
+    approval.updatedAt = now();
+    logOperation('approval', 'update', { id: approval.id });
+    return { ...approval };
+  }
+}
+
 class AuditLogModel {
   async create(params: { data: { userId: number | null; action: string; metadata?: Record<string, unknown> | null } }): Promise<AuditLog> {
     const logEntry: AuditLog = {
@@ -578,6 +924,10 @@ export class PrismaClient {
   projectChecklist = new ProjectChecklistModel();
   projectKpi = new ProjectKpiModel();
   governanceEvent = new GovernanceEventModel();
+  dataRequest = new DataRequestModel();
+  dataRequestAttachment = new DataRequestAttachmentModel();
+  finding = new FindingModel();
+  approval = new ApprovalModel();
 
   async $transaction<T>(callback: (tx: PrismaClient) => Promise<T>): Promise<T> {
     return callback(this);

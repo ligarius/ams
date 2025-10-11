@@ -242,7 +242,7 @@ const seedProjectStructure = async (
   });
 };
 
-const ensureProjectAccess = async (projectId: number, actor: User): Promise<void> => {
+export const ensureProjectAccess = async (projectId: number, actor: User): Promise<void> => {
   if (actor.role === 'ADMIN') {
     return;
   }
