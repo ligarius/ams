@@ -3,11 +3,12 @@
 Este documento propone la descomposición del PRD en historias de usuario y tareas técnicas atómicas.
 Cada ticket incluye criterios de aceptación (CA) y checklist de QA.
 
-## Estado actual (Sprint 1, 2 y 3 completados; Sprint 4 en preparación)
+## Estado actual (Sprint 1, 2 y 3 completados; Sprint 4 en curso)
 
 - ✅ **Sprint 1** está liberado en la rama principal con autenticación robusta, CRUD de usuarios/compañías y middleware de seguridad completo.
 - ✅ **Sprint 2** fue entregado con el wizard de creación sembrando automáticamente categorías, riesgos, checklists, KPIs y gobernanza para nuevos proyectos, más el overview consolidado protegido por permisos.
 - ✅ **Sprint 3** quedó cerrado con solicitudes de información (archivos incluidos), gestión integral de riesgos/hallazgos y flujos de aprobaciones.
+- 🔄 **Sprint 4** arrancó con la línea base de cobertura generada en CI (Jest arroja 77 % líneas y 78 % statements) y la revisión de necesidades de observabilidad para la siguiente iteración.
 
 La tabla siguiente recoge los entregables inmediatos priorizados para Sprint 4.
 
@@ -17,8 +18,8 @@ Los bloques de Sprints 1 a 3 permanecen como referencia histórica y sólo requi
 
 | Historia | Estado | Notas |
 | --- | --- | --- |
-| Cobertura de pruebas y métricas | Refinado | Elevar cobertura ≥80 % en servicios y publicar reportes en CI. |
-| Seguridad y observabilidad adicional | En discovery | Afinar CSP/Helmet, documentar plan de métricas y validar rate limiting. |
+| Cobertura de pruebas y métricas | En progreso | Cobertura global actual 77 % líneas; falta elevar rutas al ≥80 % y documentar export de reportes en CI. |
+| Seguridad y observabilidad adicional | Discovery | Afinar CSP/Helmet, documentar plan de métricas y validar rate limiting. |
 | Preparación de despliegues MVP | Ideación | Definir playbook de ambientes y checklist de release. |
 
 ## Sprint 1 — Backend base ✅
