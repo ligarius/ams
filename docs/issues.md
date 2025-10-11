@@ -3,7 +3,18 @@
 Este documento propone la descomposición del PRD en historias de usuario y tareas técnicas atómicas.
 Cada ticket incluye criterios de aceptación (CA) y checklist de QA.
 
-## Sprint 1 — Backend base
+## Estado actual (Sprint 1 completado)
+
+El alcance del Sprint 1 está entregado en la rama principal:
+
+- Autenticación con control de intentos fallidos, expiración de bloqueos y registro en `AuditLog`.
+- CRUD de usuarios con permisos administrados por rol, validaciones Zod y auditoría de acciones.
+- CRUD de compañías/proyectos con restricciones por membresía, unicidad por compañía y logging.
+- Middleware y utilidades técnicas (Helmet, rate limiting, Pino, cabeceras anti-cache) más script `accept` y pruebas automatizadas cubriendo los flujos críticos.
+
+Los siguientes bloques quedan como referencia histórica del Sprint 1, pero no requieren más trabajo salvo regresiones.
+
+## Sprint 1 — Backend base ✅
 
 ### 1.1 Autenticación con control de intentos
 - **Historia**: Como usuario, quiero iniciar sesión de forma segura.
@@ -59,7 +70,7 @@ Cada ticket incluye criterios de aceptación (CA) y checklist de QA.
   - Revisar configuración en CI.
   - Ejecutar `accept.sh` localmente.
 
-## Sprint 2 — Setup Wizard & correlación
+## Sprint 2 — Setup Wizard & correlación (próximo)
 
 ### 2.1 Wizard de creación de auditoría
 - **Historia**: Como consultor, quiero guiarme para crear auditoría.
