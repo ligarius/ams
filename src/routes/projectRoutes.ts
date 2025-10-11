@@ -1,11 +1,29 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { authenticate, AuthenticatedRequest } from '@/middleware/authentication';
+import { DataRequestStatus } from '@/lib/prisma';
 import { createProject, getProjectOverview, listProjects, updateProject } from '@/services/projectService';
+import {
+  addDataRequestAttachment,
+  createDataRequest,
+  listDataRequestAttachments,
+  listDataRequests,
+  updateDataRequest,
+} from '@/services/dataRequestService';
+import { createRisk, createFinding, listFindings, listProjectRisks, updateFinding, updateRisk } from '@/services/riskService';
+import { createApproval, listApprovals, transitionApproval } from '@/services/approvalService';
 
 const router = Router();
 
 router.use(authenticate);
+
+const parseNumericId = (value: string) => {
+  const id = Number(value);
+  if (Number.isNaN(id)) {
+    throw new Error('Invalid identifier');
+  }
+  return id;
+};
 
 router.get('/', async (req: AuthenticatedRequest, res) => {
   const projects = await listProjects(req.user!);
@@ -57,10 +75,7 @@ router.get('/:id/overview', async (req: AuthenticatedRequest, res) => {
 
 router.patch('/:id', async (req: AuthenticatedRequest, res) => {
   try {
-    const projectId = Number(req.params.id);
-    if (Number.isNaN(projectId)) {
-      return res.status(400).json({ message: 'Invalid project id' });
-    }
+    const projectId = parseNumericId(req.params.id);
     const project = await updateProject(projectId, req.body, req.user!);
     return res.json(project);
   } catch (error) {
@@ -72,6 +87,337 @@ router.patch('/:id', async (req: AuthenticatedRequest, res) => {
         return res.status(403).json({ message: error.message });
       }
       if (error.message === 'Project not found') {
+        return res.status(404).json({ message: error.message });
+      }
+      return res.status(400).json({ message: error.message });
+    }
+    return res.status(500).json({ message: 'Unexpected error' });
+  }
+});
+
+router.get('/:id/data-requests', async (req: AuthenticatedRequest, res) => {
+  try {
+    const projectId = parseNumericId(req.params.id);
+    const statusParam = req.query.status;
+    let status: DataRequestStatus | undefined;
+    if (statusParam !== undefined) {
+      if (typeof statusParam !== 'string') {
+        return res.status(400).json({ message: 'Invalid status filter' });
+      }
+      if (!['PENDING', 'IN_REVIEW', 'APPROVED', 'REJECTED'].includes(statusParam)) {
+        return res.status(400).json({ message: 'Invalid status filter' });
+      }
+      status = statusParam as DataRequestStatus;
+    }
+    const requests = await listDataRequests(projectId, req.user!, status);
+    return res.json(requests);
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Invalid identifier') {
+      return res.status(400).json({ message: 'Invalid project id' });
+    }
+    if (error instanceof Error && error.message === 'Insufficient permissions') {
+      return res.status(403).json({ message: error.message });
+    }
+    if (error instanceof Error) {
+      return res.status(400).json({ message: error.message });
+    }
+    return res.status(500).json({ message: 'Unexpected error' });
+  }
+});
+
+router.post('/:id/data-requests', async (req: AuthenticatedRequest, res) => {
+  try {
+    const projectId = parseNumericId(req.params.id);
+    const created = await createDataRequest(projectId, req.body, req.user!);
+    return res.status(201).json(created);
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Invalid identifier') {
+      return res.status(400).json({ message: 'Invalid project id' });
+    }
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ message: 'Invalid payload', issues: error.flatten() });
+    }
+    if (error instanceof Error) {
+      if (error.message === 'Insufficient permissions') {
+        return res.status(403).json({ message: error.message });
+      }
+      return res.status(400).json({ message: error.message });
+    }
+    return res.status(500).json({ message: 'Unexpected error' });
+  }
+});
+
+router.patch('/:id/data-requests/:dataRequestId', async (req: AuthenticatedRequest, res) => {
+  try {
+    const projectId = parseNumericId(req.params.id);
+    const dataRequestId = parseNumericId(req.params.dataRequestId);
+    const updated = await updateDataRequest(projectId, dataRequestId, req.body, req.user!);
+    return res.json(updated);
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Invalid identifier') {
+      return res.status(400).json({ message: 'Invalid identifier' });
+    }
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ message: 'Invalid payload', issues: error.flatten() });
+    }
+    if (error instanceof Error) {
+      if (error.message === 'Insufficient permissions') {
+        return res.status(403).json({ message: error.message });
+      }
+      if (error.message === 'Data request not found') {
+        return res.status(404).json({ message: error.message });
+      }
+      return res.status(400).json({ message: error.message });
+    }
+    return res.status(500).json({ message: 'Unexpected error' });
+  }
+});
+
+router.post('/:id/data-requests/:dataRequestId/files', async (req: AuthenticatedRequest, res) => {
+  try {
+    const projectId = parseNumericId(req.params.id);
+    const dataRequestId = parseNumericId(req.params.dataRequestId);
+    const attachment = await addDataRequestAttachment(projectId, dataRequestId, req.body, req.user!);
+    return res.status(201).json(attachment);
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Invalid identifier') {
+      return res.status(400).json({ message: 'Invalid identifier' });
+    }
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ message: 'Invalid payload', issues: error.flatten() });
+    }
+    if (error instanceof Error) {
+      if (error.message === 'Data request not found') {
+        return res.status(404).json({ message: error.message });
+      }
+      if (error.message === 'Insufficient permissions') {
+        return res.status(403).json({ message: error.message });
+      }
+      return res.status(400).json({ message: error.message });
+    }
+    return res.status(500).json({ message: 'Unexpected error' });
+  }
+});
+
+router.get('/:id/data-requests/:dataRequestId/files', async (req: AuthenticatedRequest, res) => {
+  try {
+    const projectId = parseNumericId(req.params.id);
+    const dataRequestId = parseNumericId(req.params.dataRequestId);
+    const attachments = await listDataRequestAttachments(projectId, dataRequestId, req.user!);
+    return res.json(attachments);
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Invalid identifier') {
+      return res.status(400).json({ message: 'Invalid identifier' });
+    }
+    if (error instanceof Error) {
+      if (error.message === 'Data request not found') {
+        return res.status(404).json({ message: error.message });
+      }
+      if (error.message === 'Insufficient permissions') {
+        return res.status(403).json({ message: error.message });
+      }
+      return res.status(400).json({ message: error.message });
+    }
+    return res.status(500).json({ message: 'Unexpected error' });
+  }
+});
+
+router.get('/:id/risks', async (req: AuthenticatedRequest, res) => {
+  try {
+    const projectId = parseNumericId(req.params.id);
+    const risks = await listProjectRisks(projectId, req.user!);
+    return res.json(risks);
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Invalid identifier') {
+      return res.status(400).json({ message: 'Invalid project id' });
+    }
+    if (error instanceof Error && error.message === 'Insufficient permissions') {
+      return res.status(403).json({ message: error.message });
+    }
+    if (error instanceof Error) {
+      return res.status(400).json({ message: error.message });
+    }
+    return res.status(500).json({ message: 'Unexpected error' });
+  }
+});
+
+router.post('/:id/risks', async (req: AuthenticatedRequest, res) => {
+  try {
+    const projectId = parseNumericId(req.params.id);
+    const risk = await createRisk(projectId, req.body, req.user!);
+    return res.status(201).json(risk);
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Invalid identifier') {
+      return res.status(400).json({ message: 'Invalid project id' });
+    }
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ message: 'Invalid payload', issues: error.flatten() });
+    }
+    if (error instanceof Error) {
+      if (error.message === 'Insufficient permissions') {
+        return res.status(403).json({ message: error.message });
+      }
+      return res.status(400).json({ message: error.message });
+    }
+    return res.status(500).json({ message: 'Unexpected error' });
+  }
+});
+
+router.patch('/:id/risks/:riskId', async (req: AuthenticatedRequest, res) => {
+  try {
+    const projectId = parseNumericId(req.params.id);
+    const riskId = parseNumericId(req.params.riskId);
+    const risk = await updateRisk(projectId, riskId, req.body, req.user!);
+    return res.json(risk);
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Invalid identifier') {
+      return res.status(400).json({ message: 'Invalid identifier' });
+    }
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ message: 'Invalid payload', issues: error.flatten() });
+    }
+    if (error instanceof Error) {
+      if (error.message === 'Insufficient permissions') {
+        return res.status(403).json({ message: error.message });
+      }
+      if (error.message === 'Risk not found') {
+        return res.status(404).json({ message: error.message });
+      }
+      return res.status(400).json({ message: error.message });
+    }
+    return res.status(500).json({ message: 'Unexpected error' });
+  }
+});
+
+router.get('/:id/findings', async (req: AuthenticatedRequest, res) => {
+  try {
+    const projectId = parseNumericId(req.params.id);
+    const findings = await listFindings(projectId, req.user!);
+    return res.json(findings);
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Invalid identifier') {
+      return res.status(400).json({ message: 'Invalid project id' });
+    }
+    if (error instanceof Error && error.message === 'Insufficient permissions') {
+      return res.status(403).json({ message: error.message });
+    }
+    if (error instanceof Error) {
+      return res.status(400).json({ message: error.message });
+    }
+    return res.status(500).json({ message: 'Unexpected error' });
+  }
+});
+
+router.post('/:id/findings', async (req: AuthenticatedRequest, res) => {
+  try {
+    const projectId = parseNumericId(req.params.id);
+    const finding = await createFinding(projectId, req.body, req.user!);
+    return res.status(201).json(finding);
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Invalid identifier') {
+      return res.status(400).json({ message: 'Invalid project id' });
+    }
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ message: 'Invalid payload', issues: error.flatten() });
+    }
+    if (error instanceof Error) {
+      if (error.message === 'Insufficient permissions') {
+        return res.status(403).json({ message: error.message });
+      }
+      if (error.message === 'Risk not found' || error.message === 'Data request not found') {
+        return res.status(404).json({ message: error.message });
+      }
+      return res.status(400).json({ message: error.message });
+    }
+    return res.status(500).json({ message: 'Unexpected error' });
+  }
+});
+
+router.patch('/:id/findings/:findingId', async (req: AuthenticatedRequest, res) => {
+  try {
+    const projectId = parseNumericId(req.params.id);
+    const findingId = parseNumericId(req.params.findingId);
+    const finding = await updateFinding(projectId, findingId, req.body, req.user!);
+    return res.json(finding);
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Invalid identifier') {
+      return res.status(400).json({ message: 'Invalid identifier' });
+    }
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ message: 'Invalid payload', issues: error.flatten() });
+    }
+    if (error instanceof Error) {
+      if (error.message === 'Insufficient permissions') {
+        return res.status(403).json({ message: error.message });
+      }
+      if (error.message === 'Finding not found' || error.message === 'Data request not found') {
+        return res.status(404).json({ message: error.message });
+      }
+      return res.status(400).json({ message: error.message });
+    }
+    return res.status(500).json({ message: 'Unexpected error' });
+  }
+});
+
+router.get('/:id/approvals', async (req: AuthenticatedRequest, res) => {
+  try {
+    const projectId = parseNumericId(req.params.id);
+    const approvals = await listApprovals(projectId, req.user!);
+    return res.json(approvals);
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Invalid identifier') {
+      return res.status(400).json({ message: 'Invalid project id' });
+    }
+    if (error instanceof Error && error.message === 'Insufficient permissions') {
+      return res.status(403).json({ message: error.message });
+    }
+    if (error instanceof Error) {
+      return res.status(400).json({ message: error.message });
+    }
+    return res.status(500).json({ message: 'Unexpected error' });
+  }
+});
+
+router.post('/:id/approvals', async (req: AuthenticatedRequest, res) => {
+  try {
+    const projectId = parseNumericId(req.params.id);
+    const approval = await createApproval(projectId, req.body, req.user!);
+    return res.status(201).json(approval);
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Invalid identifier') {
+      return res.status(400).json({ message: 'Invalid project id' });
+    }
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ message: 'Invalid payload', issues: error.flatten() });
+    }
+    if (error instanceof Error) {
+      if (error.message === 'Insufficient permissions') {
+        return res.status(403).json({ message: error.message });
+      }
+      return res.status(400).json({ message: error.message });
+    }
+    return res.status(500).json({ message: 'Unexpected error' });
+  }
+});
+
+router.patch('/:id/approvals/:approvalId', async (req: AuthenticatedRequest, res) => {
+  try {
+    const projectId = parseNumericId(req.params.id);
+    const approvalId = parseNumericId(req.params.approvalId);
+    const approval = await transitionApproval(projectId, approvalId, req.body, req.user!);
+    return res.json(approval);
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Invalid identifier') {
+      return res.status(400).json({ message: 'Invalid identifier' });
+    }
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ message: 'Invalid payload', issues: error.flatten() });
+    }
+    if (error instanceof Error) {
+      if (error.message === 'Insufficient permissions') {
+        return res.status(403).json({ message: error.message });
+      }
+      if (error.message === 'Approval not found') {
         return res.status(404).json({ message: error.message });
       }
       return res.status(400).json({ message: error.message });
