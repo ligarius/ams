@@ -3,14 +3,14 @@
 Este documento propone la descomposición del PRD en historias de usuario y tareas técnicas atómicas.
 Cada ticket incluye criterios de aceptación (CA) y checklist de QA.
 
-## Estado actual (Sprint 1, 2 y 3 completados; Sprint 4 en curso)
+## Estado actual (Sprints 1 a 4 completados)
 
 - ✅ **Sprint 1** está liberado en la rama principal con autenticación robusta, CRUD de usuarios/compañías y middleware de seguridad completo.
 - ✅ **Sprint 2** fue entregado con el wizard de creación sembrando automáticamente categorías, riesgos, checklists, KPIs y gobernanza para nuevos proyectos, más el overview consolidado protegido por permisos.
 - ✅ **Sprint 3** quedó cerrado con solicitudes de información (archivos incluidos), gestión integral de riesgos/hallazgos y flujos de aprobaciones.
-- 🔄 **Sprint 4** arrancó con la línea base de cobertura generada en CI (Jest arroja 77 % líneas y 78 % statements) y la revisión de necesidades de observabilidad para la siguiente iteración.
+- ✅ **Sprint 4** se cerró con cobertura consolidada (>81 % líneas/statements), métricas publicadas en CI y reforzamiento de observabilidad (CSP, `/metrics`, rate limiting) listo para compartir con stakeholders.
 
-La tabla siguiente recoge los entregables inmediatos priorizados para Sprint 4.
+La tabla siguiente recoge los entregables inmediatos priorizados para Sprint 4 y sirve como acta de cierre.
 
 Los bloques de Sprints 1 a 3 permanecen como referencia histórica y sólo requieren atención ante regresiones.
 
