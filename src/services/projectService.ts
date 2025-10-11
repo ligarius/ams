@@ -18,35 +18,29 @@ const isoDateSchema = z
 
 const riskLevelSchema = z.enum(['LOW', 'MEDIUM', 'HIGH']);
 
+const wizardStakeholderSchema = z.object({
+  name: z.string().min(2),
+  role: z.string().min(2),
+});
+
+const wizardMilestoneSchema = z.object({
+  name: z.string().min(2),
+  dueDate: isoDateSchema,
+});
+
+const wizardRiskSchema = z.object({
+  title: z.string().min(2),
+  description: z.string().min(1).optional(),
+  likelihood: riskLevelSchema,
+  impact: riskLevelSchema,
+});
+
 const wizardSchema = z
   .object({
-    objectives: z.array(z.string().min(3)).min(1),
-    stakeholders: z
-      .array(
-        z.object({
-          name: z.string().min(2),
-          role: z.string().min(2),
-        })
-      )
-      .min(1),
-    milestones: z
-      .array(
-        z.object({
-          name: z.string().min(2),
-          dueDate: isoDateSchema,
-        })
-      )
-      .min(1),
-    risks: z
-      .array(
-        z.object({
-          title: z.string().min(2),
-          description: z.string().min(1).optional(),
-          likelihood: riskLevelSchema,
-          impact: riskLevelSchema,
-        })
-      )
-      .min(1),
+    objectives: z.array(z.string().min(3)).optional(),
+    stakeholders: z.array(wizardStakeholderSchema).optional(),
+    milestones: z.array(wizardMilestoneSchema).optional(),
+    risks: z.array(wizardRiskSchema).optional(),
   })
   .optional();
 
@@ -138,11 +132,15 @@ const resolveWizardData = (wizard: WizardInput | undefined): ResolvedWizardData 
   if (!wizard) {
     return defaultWizardData;
   }
+
+  const ensureItems = <T>(items: T[] | undefined, fallback: T[]): T[] =>
+    items && items.length > 0 ? items : fallback;
+
   return {
-    objectives: wizard.objectives.length > 0 ? wizard.objectives : defaultWizardData.objectives,
-    milestones: wizard.milestones.length > 0 ? wizard.milestones : defaultWizardData.milestones,
-    risks: wizard.risks.length > 0 ? wizard.risks : defaultWizardData.risks,
-    stakeholders: wizard.stakeholders.length > 0 ? wizard.stakeholders : defaultWizardData.stakeholders,
+    objectives: ensureItems(wizard.objectives, defaultWizardData.objectives),
+    milestones: ensureItems(wizard.milestones, defaultWizardData.milestones),
+    risks: ensureItems(wizard.risks, defaultWizardData.risks),
+    stakeholders: ensureItems(wizard.stakeholders, defaultWizardData.stakeholders),
   };
 };
 

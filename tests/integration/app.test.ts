@@ -160,6 +160,63 @@ describe('API integration', () => {
     expect(overviewResponse.body.governance[0].owner).toBe('Laura Sponsor');
   });
 
+  it('applies default wizard data when payload is partial or missing', async () => {
+    const { accessToken } = await loginAdmin();
+
+    const partialWizardResponse = await request(app)
+      .post('/api/projects')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        companyId: 1,
+        name: 'Partial Wizard Project',
+        wizard: {
+          objectives: ['Validar controles críticos'],
+        },
+      });
+
+    expect(partialWizardResponse.status).toBe(201);
+
+    const partialOverview = await request(app)
+      .get(`/api/projects/${partialWizardResponse.body.id}/overview`)
+      .set('Authorization', `Bearer ${accessToken}`);
+
+    expect(partialOverview.status).toBe(200);
+    expect(partialOverview.body.pendingChecklists).toHaveLength(3);
+    expect(partialOverview.body.pendingChecklists[0].name).toBe('Kickoff con stakeholders');
+    expect(partialOverview.body.topRisks).toHaveLength(2);
+    expect(partialOverview.body.governance[0].owner).toBe('María González');
+
+    const defaultWizardResponse = await request(app)
+      .post('/api/projects')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        companyId: 1,
+        name: 'Default Wizard Project',
+      });
+
+    expect(defaultWizardResponse.status).toBe(201);
+
+    const defaultCategories = await prisma.projectCategory.findMany({
+      where: { projectId: defaultWizardResponse.body.id },
+    });
+    expect(defaultCategories).toHaveLength(3);
+    expect(defaultCategories[0].name).toBe('Comprender el marco de control y gobierno actual');
+
+    const defaultGovernance = await prisma.governanceEvent.findMany({
+      where: { projectId: defaultWizardResponse.body.id },
+    });
+    expect(defaultGovernance).toHaveLength(3);
+    expect(defaultGovernance[0].owner).toBe('María González');
+
+    const defaultOverview = await request(app)
+      .get(`/api/projects/${defaultWizardResponse.body.id}/overview`)
+      .set('Authorization', `Bearer ${accessToken}`);
+
+    expect(defaultOverview.status).toBe(200);
+    expect(defaultOverview.body.kpis).toHaveLength(3);
+    expect(defaultOverview.body.pendingChecklists).toHaveLength(3);
+  });
+
   it('returns 403 when client attempts to create a project', async () => {
     const { accessToken } = await loginAdmin();
     const clientEmail = 'client.forbidden@example.com';
