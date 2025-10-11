@@ -1,4 +1,8 @@
 node_modules
+apps/web/node_modules
+.next
+apps/web/.next
+apps/web/.turbo
 .env
 coverage
 dist
