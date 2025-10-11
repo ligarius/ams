@@ -45,6 +45,18 @@ El sistema incluye un usuario administrador inicial:
 
 También se crea la compañía `Acme Corp` para las pruebas.
 
+## Cómo probar en local
+
+1. Asegúrate de haber seguido la sección de **Configuración** y tener las dependencias instaladas.
+2. Inicia la base de datos en memoria y las semillas ejecutando las pruebas (no se requiere paso adicional).
+3. Ejecuta los siguientes comandos según lo que quieras validar:
+   - `npm test`: corre las pruebas unitarias y de integración.
+   - `npm run lint`: valida el estilo de código con ESLint.
+   - `npm run typecheck`: verifica los tipos con TypeScript.
+   - `npm run accept`: ejecuta lint, typecheck y pruebas en secuencia, equivalente al QA del sprint.
+
+> Consejo: durante el desarrollo puedes lanzar `npm run dev` en otra terminal para probar la API manualmente mientras ejecutas las pruebas.
+
 ## Pruebas
 
 Se incluyen pruebas unitarias para el servicio de autenticación y pruebas de integración que cubren los flujos críticos del sprint (login, bloqueo, gestión de usuarios, proyectos y refresh/logout). Ejecuta `npm run accept` para validar la calidad antes de desplegar.
