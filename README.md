@@ -1,6 +1,6 @@
 # AMS Backend — MVP Auditoría
 
-Este repositorio contiene la base del backend para el MVP de Auditoría. El Sprint 1 ya se encuentra entregado (autenticación, gestión de usuarios/compañías y middleware de seguridad) y el Sprint 2 está en preparación para habilitar el wizard de creación de auditorías y el overview completo del proyecto.
+Este repositorio contiene la base del backend para el MVP de Auditoría. El Sprint 1 ya se encuentra entregado (autenticación, gestión de usuarios/compañías y middleware de seguridad) y el Sprint 2 también fue liberado: ahora el wizard de creación de auditorías siembra categorías, riesgos, checklists, KPIs y gobernanza inicial automáticamente y el overview consolida la información resultante con controles de permisos end-to-end.
 
 ## Requisitos
 

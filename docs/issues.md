@@ -3,21 +3,23 @@
 Este documento propone la descomposición del PRD en historias de usuario y tareas técnicas atómicas.
 Cada ticket incluye criterios de aceptación (CA) y checklist de QA.
 
-## Estado actual (Sprint 1 completado, Sprint 2 en preparación)
+## Estado actual (Sprint 1 y 2 completados, Sprint 3 en preparación)
 
 - ✅ **Sprint 1** está liberado en la rama principal con autenticación robusta, CRUD de usuarios/compañías y middleware de seguridad completo.
-- 🛠️ **Sprint 2** se encuentra en fase de refinamiento. Las historias ya están detalladas y restan estimaciones finales con el equipo de frontend.
-- 📌 Se registran aquí los pendientes funcionales y técnicos que guían los siguientes incrementos.
+- ✅ **Sprint 2** fue entregado con el wizard de creación sembrando automáticamente categorías, riesgos, checklists, KPIs y gobernanza para nuevos proyectos, más el overview consolidado protegido por permisos.
+- 🛠️ **Sprint 3** se encuentra en refinamiento y concentra los próximos módulos operativos.
 
-Los bloques del Sprint 1 permanecen como referencia histórica y sólo requieren atención ante regresiones.
+La tabla siguiente recoge los entregables inmediatos priorizados para Sprint 3.
+
+Los bloques de Sprints 1 y 2 permanecen como referencia histórica y sólo requieren atención ante regresiones.
 
 ### Próximos entregables prioritarios
 
 | Historia | Estado | Notas |
 | --- | --- | --- |
-| Wizard de creación de auditoría | Refinado | Definir dependencias UI y contratos de API antes del grooming final. |
-| Seeds de estructura inicial | Refinado | Validar volumen inicial de datos con equipo funcional. |
-| Overview del proyecto | Pendiente | Alinear métricas clave y mocks de diseño. |
+| Data Requests con gestión de archivos | Refinado | Definir alcance de almacenamiento seguro y flujos de aprobación. |
+| Gestión de riesgos y hallazgos | Refinado | Consolidar reglas de negocio y dependencias de UI. |
+| Aprobaciones (Scope Change) | En discovery | Ajustar lineamientos de comité y eventos de auditoría. |
 
 ## Sprint 1 — Backend base ✅
 
@@ -75,7 +77,9 @@ Los bloques del Sprint 1 permanecen como referencia histórica y sólo requier
   - Revisar configuración en CI.
   - Ejecutar `accept.sh` localmente.
 
-## Sprint 2 — Setup Wizard & correlación (próximo)
+## Sprint 2 — Setup Wizard & correlación ✅
+
+Las tres historias del sprint se encuentran en producción y están cubiertas por pruebas de integración que ejercitan la creación de proyectos, el seeding automático y el overview consolidado.
 
 ### 2.1 Wizard de creación de auditoría
 - **Historia**: Como consultor, quiero guiarme para crear auditoría.
@@ -87,8 +91,7 @@ Los bloques del Sprint 1 permanecen como referencia histórica y sólo requier
   - Completar wizard crea proyecto con relaciones iniciales.
   - Validaciones cliente/servidor coherentes.
 - **QA**:
-  - E2E: flujo completo del wizard.
-  - Tests de componentes de formularios.
+  - Pruebas de integración `tests/integration/app.test.ts` validan creación de proyectos vía wizard, auditoría de eventos y overview tras la siembra inicial.
 
 ### 2.2 Seeds de estructura inicial
 - **Historia**: Como consultor, quiero plantillas base al crear auditoría.
@@ -99,8 +102,7 @@ Los bloques del Sprint 1 permanecen como referencia histórica y sólo requier
   - Proyecto nuevo muestra datos iniciales en overview.
   - AuditLog refleja creación masiva.
 - **QA**:
-  - Tests unitarios de servicios de seed.
-  - Validación manual del overview.
+  - Pruebas de integración `tests/integration/app.test.ts` cubren siembra de categorías, riesgos, checklists, KPIs y eventos de gobernanza, incluyendo datos por defecto cuando faltan secciones del wizard.
 
 ### 2.3 Overview del proyecto
 - **Historia**: Como miembro, quiero ver resumen al entrar.
@@ -111,8 +113,7 @@ Los bloques del Sprint 1 permanecen como referencia histórica y sólo requier
   - KPIs, riesgos abiertos y solicitudes pendientes visibles.
   - Permisos verificados por membresía.
 - **QA**:
-  - Tests de integración para agregaciones.
-  - Snapshot tests UI overview.
+  - Pruebas de integración `tests/integration/app.test.ts` ejercitan el endpoint `/api/projects/:id/overview`, ordenan pendientes y riesgos y validan permisos ante usuarios sin membresía.
 
 ## Sprint 3 — Módulos operativos
 
