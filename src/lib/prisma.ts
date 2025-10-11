@@ -56,6 +56,63 @@ export interface RefreshToken {
   revokedAt: Date | null;
 }
 
+export type RiskLevel = 'LOW' | 'MEDIUM' | 'HIGH';
+export type RiskStatus = 'OPEN' | 'IN_PROGRESS' | 'RESOLVED';
+export type ChecklistStatus = 'PENDING' | 'COMPLETED';
+export type GovernanceCadence = 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'AD_HOC';
+export type GovernanceType = 'STEERING_COMMITTEE' | 'WORKING_GROUP' | 'SPONSOR_CHECKIN';
+
+export interface ProjectCategory {
+  id: number;
+  projectId: number;
+  name: string;
+  description: string | null;
+  createdAt: Date;
+}
+
+export interface ProjectRisk {
+  id: number;
+  projectId: number;
+  categoryId: number | null;
+  title: string;
+  description: string | null;
+  severity: RiskLevel;
+  likelihood: RiskLevel;
+  status: RiskStatus;
+  createdAt: Date;
+}
+
+export interface ProjectChecklist {
+  id: number;
+  projectId: number;
+  name: string;
+  dueDate: Date | null;
+  status: ChecklistStatus;
+  createdAt: Date;
+}
+
+export interface ProjectKpi {
+  id: number;
+  projectId: number;
+  name: string;
+  target: number;
+  current: number;
+  unit: string;
+  trend: 'UP' | 'DOWN' | 'STABLE';
+  createdAt: Date;
+}
+
+export interface GovernanceEvent {
+  id: number;
+  projectId: number;
+  type: GovernanceType;
+  name: string;
+  cadence: GovernanceCadence;
+  owner: string;
+  nextMeetingAt: Date | null;
+  createdAt: Date;
+}
+
 interface DatabaseState {
   users: User[];
   companies: Company[];
@@ -63,6 +120,11 @@ interface DatabaseState {
   memberships: Membership[];
   auditLogs: AuditLog[];
   refreshTokens: RefreshToken[];
+  projectCategories: ProjectCategory[];
+  projectRisks: ProjectRisk[];
+  projectChecklists: ProjectChecklist[];
+  projectKpis: ProjectKpi[];
+  governanceEvents: GovernanceEvent[];
   sequences: Record<string, number>;
 }
 
@@ -73,6 +135,11 @@ const state: DatabaseState = {
   memberships: [],
   auditLogs: [],
   refreshTokens: [],
+  projectCategories: [],
+  projectRisks: [],
+  projectChecklists: [],
+  projectKpis: [],
+  governanceEvents: [],
   sequences: {},
 };
 
@@ -124,6 +191,11 @@ const resetState = () => {
   state.memberships = [];
   state.auditLogs = [];
   state.refreshTokens = [];
+  state.projectCategories = [];
+  state.projectRisks = [];
+  state.projectChecklists = [];
+  state.projectKpis = [];
+  state.governanceEvents = [];
   state.sequences = {};
   seed();
 };
@@ -295,6 +367,141 @@ class MembershipModel {
   }
 }
 
+class ProjectCategoryModel {
+  async findMany(params: { where: { projectId: number } }): Promise<ProjectCategory[]> {
+    return state.projectCategories
+      .filter((category) => category.projectId === params.where.projectId)
+      .map((category) => ({ ...category }));
+  }
+
+  async create(params: { data: { projectId: number; name: string; description?: string | null } }): Promise<ProjectCategory> {
+    const category: ProjectCategory = {
+      id: nextId('projectCategories'),
+      projectId: params.data.projectId,
+      name: params.data.name,
+      description: params.data.description ?? null,
+      createdAt: now(),
+    };
+    state.projectCategories.push(category);
+    logOperation('projectCategory', 'create', { id: category.id, projectId: category.projectId });
+    return { ...category };
+  }
+}
+
+class ProjectRiskModel {
+  async findMany(params: { where: { projectId: number } }): Promise<ProjectRisk[]> {
+    return state.projectRisks
+      .filter((risk) => risk.projectId === params.where.projectId)
+      .map((risk) => ({ ...risk }));
+  }
+
+  async create(params: {
+    data: {
+      projectId: number;
+      categoryId?: number | null;
+      title: string;
+      description?: string | null;
+      severity: RiskLevel;
+      likelihood: RiskLevel;
+      status?: RiskStatus;
+    };
+  }): Promise<ProjectRisk> {
+    const risk: ProjectRisk = {
+      id: nextId('projectRisks'),
+      projectId: params.data.projectId,
+      categoryId: params.data.categoryId ?? null,
+      title: params.data.title,
+      description: params.data.description ?? null,
+      severity: params.data.severity,
+      likelihood: params.data.likelihood,
+      status: params.data.status ?? 'OPEN',
+      createdAt: now(),
+    };
+    state.projectRisks.push(risk);
+    logOperation('projectRisk', 'create', { id: risk.id, projectId: risk.projectId });
+    return { ...risk };
+  }
+}
+
+class ProjectChecklistModel {
+  async findMany(params: { where: { projectId: number } }): Promise<ProjectChecklist[]> {
+    return state.projectChecklists
+      .filter((checklist) => checklist.projectId === params.where.projectId)
+      .map((checklist) => ({ ...checklist }));
+  }
+
+  async create(params: { data: { projectId: number; name: string; dueDate?: Date | null; status?: ChecklistStatus } }): Promise<ProjectChecklist> {
+    const checklist: ProjectChecklist = {
+      id: nextId('projectChecklists'),
+      projectId: params.data.projectId,
+      name: params.data.name,
+      dueDate: params.data.dueDate ?? null,
+      status: params.data.status ?? 'PENDING',
+      createdAt: now(),
+    };
+    state.projectChecklists.push(checklist);
+    logOperation('projectChecklist', 'create', { id: checklist.id, projectId: checklist.projectId });
+    return { ...checklist };
+  }
+}
+
+class ProjectKpiModel {
+  async findMany(params: { where: { projectId: number } }): Promise<ProjectKpi[]> {
+    return state.projectKpis
+      .filter((kpi) => kpi.projectId === params.where.projectId)
+      .map((kpi) => ({ ...kpi }));
+  }
+
+  async create(params: { data: { projectId: number; name: string; target: number; current?: number; unit?: string; trend?: 'UP' | 'DOWN' | 'STABLE' } }): Promise<ProjectKpi> {
+    const kpi: ProjectKpi = {
+      id: nextId('projectKpis'),
+      projectId: params.data.projectId,
+      name: params.data.name,
+      target: params.data.target,
+      current: params.data.current ?? 0,
+      unit: params.data.unit ?? '%',
+      trend: params.data.trend ?? 'STABLE',
+      createdAt: now(),
+    };
+    state.projectKpis.push(kpi);
+    logOperation('projectKpi', 'create', { id: kpi.id, projectId: kpi.projectId });
+    return { ...kpi };
+  }
+}
+
+class GovernanceEventModel {
+  async findMany(params: { where: { projectId: number } }): Promise<GovernanceEvent[]> {
+    return state.governanceEvents
+      .filter((event) => event.projectId === params.where.projectId)
+      .map((event) => ({ ...event }));
+  }
+
+  async create(params: {
+    data: {
+      projectId: number;
+      type: GovernanceType;
+      name: string;
+      cadence: GovernanceCadence;
+      owner: string;
+      nextMeetingAt?: Date | null;
+    };
+  }): Promise<GovernanceEvent> {
+    const event: GovernanceEvent = {
+      id: nextId('governanceEvents'),
+      projectId: params.data.projectId,
+      type: params.data.type,
+      name: params.data.name,
+      cadence: params.data.cadence,
+      owner: params.data.owner,
+      nextMeetingAt: params.data.nextMeetingAt ?? null,
+      createdAt: now(),
+    };
+    state.governanceEvents.push(event);
+    logOperation('governanceEvent', 'create', { id: event.id, projectId: event.projectId, type: event.type });
+    return { ...event };
+  }
+}
+
 class AuditLogModel {
   async create(params: { data: { userId: number | null; action: string; metadata?: Record<string, unknown> | null } }): Promise<AuditLog> {
     const logEntry: AuditLog = {
@@ -360,6 +567,11 @@ export class PrismaClient {
   membership = new MembershipModel();
   auditLog = new AuditLogModel();
   refreshToken = new RefreshTokenModel();
+  projectCategory = new ProjectCategoryModel();
+  projectRisk = new ProjectRiskModel();
+  projectChecklist = new ProjectChecklistModel();
+  projectKpi = new ProjectKpiModel();
+  governanceEvent = new GovernanceEventModel();
 
   async $transaction<T>(callback: (tx: PrismaClient) => Promise<T>): Promise<T> {
     return callback(this);
