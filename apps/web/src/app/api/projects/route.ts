@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { ensureSession, clearSessionCookie } from '@/lib/auth/session';
+import prisma from '@backend/lib/prisma';
+import { createProject } from '@backend/services/projectService';
 import { ensureSession } from '@/lib/auth/session';
 
 const API_BASE_URL = process.env.API_BASE_URL ?? 'http://localhost:3000';
@@ -59,6 +62,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: 'No autorizado' }, { status: 401 });
   }
 
+  const actor = await prisma.user.findUnique({ where: { id: session.user.id } });
+  if (!actor) {
+    await clearSessionCookie();
+    return NextResponse.json({ message: 'Sesión inválida' }, { status: 401 });
+  }
+
   const body = await request.json().catch(() => null);
   const parsed = projectPayloadSchema.safeParse(body);
   if (!parsed.success) {
@@ -66,27 +75,16 @@ export async function POST(request: Request) {
   }
 
   try {
-    const response = await fetch(`${API_BASE_URL}/api/projects`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${session.accessToken}`,
-      },
-      body: JSON.stringify(parsed.data),
-      cache: 'no-store',
-    });
-
-    if (!response.ok) {
-      const errorBody = await response.json().catch(() => null);
-      return NextResponse.json(
-        { message: errorBody?.message ?? 'No se pudo crear el proyecto' },
-        { status: response.status }
-      );
-    }
-
-    const payload = await response.json();
-    return NextResponse.json(payload, { status: 201 });
+    const project = await createProject(parsed.data, actor);
+    return NextResponse.json(project, { status: 201 });
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json({ message: 'Datos inválidos', issues: error.flatten() }, { status: 400 });
+    }
+    if (error instanceof Error) {
+      const status = error.message === 'Insufficient permissions' ? 403 : 400;
+      return NextResponse.json({ message: error.message }, { status });
+    }
     console.error('Failed to create project', error);
     return NextResponse.json({ message: 'Error inesperado al crear el proyecto' }, { status: 500 });
   }

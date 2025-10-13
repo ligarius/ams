@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers';
 import { jwtDecode } from 'jwt-decode';
+import { AuthError, refresh as refreshSessionFromBackend } from '@backend/services/authService';
 
 const SESSION_COOKIE = 'ams.session';
 const MAX_AGE_SECONDS = 60 * 60 * 24 * 7; // 7 days
@@ -15,8 +16,6 @@ export interface SessionPayload {
   refreshToken: string;
   user: SessionUser;
 }
-
-const API_BASE_URL = process.env.API_BASE_URL ?? 'http://localhost:3000';
 
 const encodeSession = (session: SessionPayload) =>
   encodeURIComponent(JSON.stringify(session));
@@ -80,16 +79,7 @@ const refreshSession = async (
     return null;
   }
   try {
-    const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      cache: 'no-store',
-      body: JSON.stringify({ refreshToken: session.refreshToken }),
-    });
-    if (!response.ok) {
-      throw new Error(`Refresh failed with status ${response.status}`);
-    }
-    const result = (await response.json()) as SessionPayload;
+    const result = await refreshSessionFromBackend(session.refreshToken);
     const updated: SessionPayload = {
       accessToken: result.accessToken,
       refreshToken: result.refreshToken,
@@ -100,7 +90,11 @@ const refreshSession = async (
     }
     return updated;
   } catch (error) {
-    console.warn('Unable to refresh session', error);
+    if (error instanceof AuthError) {
+      console.warn('Unable to refresh session', { message: error.message, status: error.status });
+    } else {
+      console.warn('Unable to refresh session', error);
+    }
     if (options.mutateCookies) {
       await clearSessionCookie();
     }
