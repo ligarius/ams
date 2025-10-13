@@ -2,11 +2,11 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { ensureSession, clearSessionCookie } from '@/lib/auth/session';
 import prisma from '@backend/lib/prisma';
-import { createProject } from '@backend/services/projectService';
-
-const API_BASE_URL = process.env.API_BASE_URL ?? 'http://localhost:3000';
+import { AUDIT_FRAMEWORK_VALUES } from '@backend/config/auditFrameworks';
+import { createProject, listProjects } from '@backend/services/projectService';
 
 const riskLevelSchema = z.enum(['LOW', 'MEDIUM', 'HIGH']);
+const auditFrameworkEnum = z.enum(AUDIT_FRAMEWORK_VALUES);
 
 const wizardPayloadSchema = z
   .object({
@@ -37,6 +37,7 @@ const wizardPayloadSchema = z
         })
       )
       .optional(),
+    frameworks: z.array(auditFrameworkEnum).min(1).optional(),
   })
   .optional();
 
@@ -54,6 +55,22 @@ const projectPayloadSchema = z.object({
     .optional(),
   wizard: wizardPayloadSchema,
 });
+
+export async function GET() {
+  const session = await ensureSession({ mutateCookies: true });
+  if (!session) {
+    return NextResponse.json({ message: 'No autorizado' }, { status: 401 });
+  }
+
+  const actor = await prisma.user.findUnique({ where: { id: session.user.id } });
+  if (!actor) {
+    await clearSessionCookie();
+    return NextResponse.json({ message: 'Sesión inválida' }, { status: 401 });
+  }
+
+  const projects = await listProjects(actor);
+  return NextResponse.json(projects);
+}
 
 export async function POST(request: Request) {
   const session = await ensureSession({ mutateCookies: true });

@@ -1,4 +1,10 @@
 import { z } from 'zod';
+import {
+  AUDIT_FRAMEWORK_DEFINITIONS,
+  AUDIT_FRAMEWORK_VALUES,
+  DEFAULT_AUDIT_FRAMEWORK_SELECTION,
+  type AuditFrameworkId,
+} from '@/config/auditFrameworks';
 import prisma, {
   ChecklistStatus,
   GovernanceCadence,
@@ -35,12 +41,15 @@ const wizardRiskSchema = z.object({
   impact: riskLevelSchema,
 });
 
+const auditFrameworkEnum = z.enum(AUDIT_FRAMEWORK_VALUES);
+
 const wizardSchema = z
   .object({
     objectives: z.array(z.string().min(3)).optional(),
     stakeholders: z.array(wizardStakeholderSchema).optional(),
     milestones: z.array(wizardMilestoneSchema).optional(),
     risks: z.array(wizardRiskSchema).optional(),
+    frameworks: z.array(auditFrameworkEnum).min(1).optional(),
   })
   .optional();
 
@@ -88,6 +97,7 @@ type ResolvedWizardData = {
   milestones: WizardMilestone[];
   risks: WizardRisk[];
   stakeholders: WizardStakeholder[];
+  frameworks: AuditFrameworkId[];
 };
 
 const addDays = (days: number): Date => {
@@ -126,6 +136,7 @@ const defaultWizardData: ResolvedWizardData = {
     { name: 'Comité de dirección', role: 'Steering Committee' },
     { name: 'Equipo auditor', role: 'Working Group' },
   ],
+  frameworks: DEFAULT_AUDIT_FRAMEWORK_SELECTION,
 };
 
 const resolveWizardData = (wizard: WizardInput | undefined): ResolvedWizardData => {
@@ -141,6 +152,7 @@ const resolveWizardData = (wizard: WizardInput | undefined): ResolvedWizardData 
     milestones: ensureItems(wizard.milestones, defaultWizardData.milestones),
     risks: ensureItems(wizard.risks, defaultWizardData.risks),
     stakeholders: ensureItems(wizard.stakeholders, defaultWizardData.stakeholders),
+    frameworks: ensureItems(wizard.frameworks, defaultWizardData.frameworks),
   };
 };
 
@@ -195,6 +207,20 @@ const seedProjectStructure = async (
     });
   }
 
+  for (const frameworkId of wizard.frameworks) {
+    const framework = AUDIT_FRAMEWORK_DEFINITIONS[frameworkId];
+    for (const checklistName of framework.checklist) {
+      await tx.projectChecklist.create({
+        data: {
+          projectId,
+          name: `[Framework: ${framework.label}] ${checklistName}`,
+          dueDate: null,
+          status: 'PENDING',
+        },
+      });
+    }
+  }
+
   const kpis = [
     { name: 'Evidencia recopilada', target: 100, unit: '%', trend: 'STABLE' as const },
     { name: 'Entrevistas completadas', target: 20, unit: 'count', trend: 'STABLE' as const },
@@ -228,6 +254,10 @@ const seedProjectStructure = async (
     });
   }
 
+  const seededChecklistCount =
+    wizard.milestones.length +
+    wizard.frameworks.reduce((total, frameworkId) => total + AUDIT_FRAMEWORK_DEFINITIONS[frameworkId].checklist.length, 0);
+
   await tx.auditLog.create({
     data: {
       userId: actor.id,
@@ -236,7 +266,8 @@ const seedProjectStructure = async (
         projectId,
         categories: wizard.objectives.length,
         risks: wizard.risks.length,
-        checklists: wizard.milestones.length,
+        checklists: seededChecklistCount,
+        frameworks: wizard.frameworks,
       },
     },
   });
