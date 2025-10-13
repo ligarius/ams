@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { ensureSession } from '@/lib/auth/session';
 
 export async function GET() {
-  const session = await ensureSession();
+  const session = await ensureSession({ mutateCookies: true });
   if (!session) {
     return NextResponse.json({ authenticated: false }, { status: 401 });
   }
