@@ -2,6 +2,7 @@ import { ensureSession } from '@/lib/auth/session';
 import { redirect } from 'next/navigation';
 import { SessionProvider } from '@/components/session-provider';
 import { Navigation } from '@/components/navigation';
+import { Box, Container } from '@mui/material';
 
 export default async function ProtectedLayout({
   children,
@@ -15,12 +16,12 @@ export default async function ProtectedLayout({
 
   return (
     <SessionProvider user={session.user}>
-      <div className="min-h-screen bg-slate-950 text-slate-100">
+      <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
         <Navigation />
-        <main className="mx-auto flex max-w-6xl flex-1 flex-col gap-8 px-6 py-10">
+        <Container component="main" maxWidth="lg" sx={{ py: { xs: 6, md: 8 }, display: 'flex', flexDirection: 'column', gap: 5 }}>
           {children}
-        </main>
-      </div>
+        </Container>
+      </Box>
     </SessionProvider>
   );
 }
