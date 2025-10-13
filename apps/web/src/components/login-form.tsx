@@ -1,10 +1,12 @@
 'use client';
 
 import { useState } from 'react';
+import NextLink from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { Alert, Box, Button, Link as MuiLink, Stack, TextField, Typography } from '@mui/material';
 
 const schema = z.object({
   email: z.string().email('Ingresa un correo válido'),
@@ -44,60 +46,56 @@ export function LoginForm() {
   };
 
   return (
-    <form className="space-y-6" onSubmit={handleSubmit(onSubmit)} noValidate>
-      <div className="space-y-2">
-        <label className="block text-sm font-medium text-slate-700" htmlFor="email">
-          Correo electrónico
-        </label>
-        <input
+    <Box component="form" onSubmit={handleSubmit(onSubmit)} noValidate>
+      <Stack spacing={3}>
+        <TextField
           id="email"
           type="email"
+          label="Correo electrónico"
           autoComplete="email"
-          className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm transition focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/30"
-          placeholder="tucuenta@empresa.com"
-          aria-invalid={errors.email ? 'true' : 'false'}
+          error={Boolean(errors.email)}
+          helperText={errors.email?.message}
+          fullWidth
           {...register('email')}
         />
-        {errors.email && (
-          <p className="text-sm text-rose-600" role="alert">
-            {errors.email.message}
-          </p>
-        )}
-      </div>
 
-      <div className="space-y-2">
-        <label className="block text-sm font-medium text-slate-700" htmlFor="password">
-          Contraseña
-        </label>
-        <input
+        <TextField
           id="password"
           type="password"
+          label="Contraseña"
           autoComplete="current-password"
-          className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm transition focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/30"
-          placeholder="Ingresa tu contraseña"
-          aria-invalid={errors.password ? 'true' : 'false'}
+          error={Boolean(errors.password)}
+          helperText={errors.password?.message}
+          fullWidth
           {...register('password')}
         />
-        {errors.password && (
-          <p className="text-sm text-rose-600" role="alert">
-            {errors.password.message}
-          </p>
+
+        {serverError && (
+          <Alert severity="error" variant="outlined">
+            {serverError}
+          </Alert>
         )}
-      </div>
 
-      {serverError && (
-        <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-600" role="alert">
-          {serverError}
-        </p>
-      )}
+        <Button type="submit" variant="contained" size="large" disabled={isSubmitting} fullWidth>
+          {isSubmitting ? 'Ingresando…' : 'Iniciar sesión'}
+        </Button>
 
-      <button
-        type="submit"
-        className="flex w-full items-center justify-center rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 px-4 py-3 text-sm font-semibold text-white shadow-md transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-60"
-        disabled={isSubmitting}
-      >
-        {isSubmitting ? 'Ingresando…' : 'Iniciar sesión'}
-      </button>
-    </form>
+        <Stack direction="row" alignItems="center" justifyContent="space-between">
+          <MuiLink component={NextLink} href="#" variant="body2">
+            ¿Olvidaste tu contraseña?
+          </MuiLink>
+          <Typography variant="caption" color="text.secondary">
+            Protegido con MFA
+          </Typography>
+        </Stack>
+
+        <Typography variant="body2" color="text.secondary" textAlign="center">
+          ¿No tienes una cuenta?{' '}
+          <MuiLink component={NextLink} href="#" fontWeight={600} color="primary">
+            Solicita acceso
+          </MuiLink>
+        </Typography>
+      </Stack>
+    </Box>
   );
 }

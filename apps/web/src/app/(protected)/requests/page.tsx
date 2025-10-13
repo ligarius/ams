@@ -1,3 +1,6 @@
+import FiberManualRecordIcon from '@mui/icons-material/FiberManualRecord';
+import { List, ListItem, ListItemIcon, ListItemText, Paper, Stack, Typography } from '@mui/material';
+
 const checklist = [
   'Solicitudes pendientes por vencer',
   'Evidencia cargada por clientes',
@@ -6,34 +9,40 @@ const checklist = [
 
 export default function RequestsPage() {
   return (
-    <div className="space-y-8">
-      <header className="space-y-2">
-        <p className="text-sm uppercase tracking-[0.3em] text-blue-200/80">Solicitudes</p>
-        <h1 className="text-2xl font-semibold text-slate-100">Gestiona la información crítica</h1>
-        <p className="max-w-3xl text-sm text-slate-400">
+    <Stack spacing={6}>
+      <Stack spacing={1.5}>
+        <Typography variant="overline" color="primary.main" sx={{ letterSpacing: '0.3em' }}>
+          Solicitudes
+        </Typography>
+        <Typography variant="h4">Gestiona la información crítica</Typography>
+        <Typography variant="body2" color="text.secondary" maxWidth={600}>
           Esta vista presentará la cola de solicitudes de información conectada al backend. Desde Sprint F2 se integrará con el
           wizard y con la subida de archivos.
-        </p>
-      </header>
-      <section className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
-        <h2 className="text-base font-semibold text-slate-100">Panel operativo próximo</h2>
-        <ul className="mt-4 space-y-2 text-sm text-slate-400">
+        </Typography>
+      </Stack>
+
+      <Paper variant="outlined" sx={{ p: 3.5 }}>
+        <Typography variant="h6" gutterBottom>
+          Panel operativo próximo
+        </Typography>
+        <List dense disablePadding>
           {checklist.map((item) => (
-            <li key={item} className="flex items-start gap-3">
-              <span className="mt-1 inline-flex h-5 w-5 items-center justify-center rounded-full border border-blue-400/60 text-[11px] font-semibold text-blue-200">
-                •
-              </span>
-              <span>{item}</span>
-            </li>
+            <ListItem key={item} disableGutters sx={{ alignItems: 'flex-start', py: 1 }}>
+              <ListItemIcon sx={{ minWidth: 32, mt: 0.4 }}>
+                <FiberManualRecordIcon color="secondary" sx={{ fontSize: 12 }} />
+              </ListItemIcon>
+              <ListItemText primaryTypographyProps={{ variant: 'body2' }} primary={item} />
+            </ListItem>
           ))}
-        </ul>
-      </section>
-      <section className="rounded-2xl border border-dashed border-slate-800 bg-slate-900/40 p-6 text-sm text-slate-500">
-        <p>
+        </List>
+      </Paper>
+
+      <Paper variant="outlined" sx={{ p: 3.5, borderStyle: 'dashed', borderWidth: 2 }}>
+        <Typography variant="body2" color="text.secondary">
           La autenticación ya está lista, por lo que cualquier dato que aparezca aquí respetará los permisos de membresía definidos
           en el backend. Los próximos sprints conectarán este layout con componentes dinámicos y workflows aprobatorios.
-        </p>
-      </section>
-    </div>
+        </Typography>
+      </Paper>
+    </Stack>
   );
 }
