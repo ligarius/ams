@@ -1,16 +1,12 @@
 import { NextResponse } from 'next/server';
 import { clearSessionCookie, getSession } from '@/lib/auth/session';
-
-const API_BASE_URL = process.env.API_BASE_URL ?? 'http://localhost:3000';
+import { logout as backendLogout } from '@backend/services/authService';
 
 export async function POST(request: Request) {
   try {
     const session = await getSession();
     if (session) {
-      await fetch(`${API_BASE_URL}/api/auth/logout`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${session.accessToken}` },
-      }).catch(() => undefined);
+      await backendLogout(session.user.id);
     }
   } finally {
     await clearSessionCookie();
