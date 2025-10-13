@@ -3,6 +3,9 @@ import { z } from 'zod';
 import { ensureSession, clearSessionCookie } from '@/lib/auth/session';
 import prisma from '@backend/lib/prisma';
 import { createProject } from '@backend/services/projectService';
+import { ensureSession } from '@/lib/auth/session';
+
+const API_BASE_URL = process.env.API_BASE_URL ?? 'http://localhost:3000';
 
 const riskLevelSchema = z.enum(['LOW', 'MEDIUM', 'HIGH']);
 
