@@ -44,42 +44,56 @@ export function LoginForm() {
   };
 
   return (
-    <form className="space-y-5" onSubmit={handleSubmit(onSubmit)} noValidate>
+    <form className="space-y-6" onSubmit={handleSubmit(onSubmit)} noValidate>
       <div className="space-y-2">
-        <label className="block text-sm font-medium" htmlFor="email">
+        <label className="block text-sm font-medium text-slate-700" htmlFor="email">
           Correo electrónico
         </label>
         <input
           id="email"
           type="email"
           autoComplete="email"
-          className="w-full rounded-md border border-slate-600 bg-slate-900/60 px-3 py-2 text-slate-100 shadow-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+          className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm transition focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/30"
           placeholder="tucuenta@empresa.com"
+          aria-invalid={errors.email ? 'true' : 'false'}
           {...register('email')}
         />
-        {errors.email && <p className="text-sm text-rose-300">{errors.email.message}</p>}
+        {errors.email && (
+          <p className="text-sm text-rose-600" role="alert">
+            {errors.email.message}
+          </p>
+        )}
       </div>
 
       <div className="space-y-2">
-        <label className="block text-sm font-medium" htmlFor="password">
+        <label className="block text-sm font-medium text-slate-700" htmlFor="password">
           Contraseña
         </label>
         <input
           id="password"
           type="password"
           autoComplete="current-password"
-          className="w-full rounded-md border border-slate-600 bg-slate-900/60 px-3 py-2 text-slate-100 shadow-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+          className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm transition focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/30"
           placeholder="Ingresa tu contraseña"
+          aria-invalid={errors.password ? 'true' : 'false'}
           {...register('password')}
         />
-        {errors.password && <p className="text-sm text-rose-300">{errors.password.message}</p>}
+        {errors.password && (
+          <p className="text-sm text-rose-600" role="alert">
+            {errors.password.message}
+          </p>
+        )}
       </div>
 
-      {serverError && <p className="text-sm text-rose-300">{serverError}</p>}
+      {serverError && (
+        <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-600" role="alert">
+          {serverError}
+        </p>
+      )}
 
       <button
         type="submit"
-        className="flex w-full items-center justify-center rounded-md bg-blue-500 px-4 py-2 font-medium text-white transition hover:bg-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-300 disabled:cursor-not-allowed disabled:bg-blue-900"
+        className="flex w-full items-center justify-center rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 px-4 py-3 text-sm font-semibold text-white shadow-md transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-60"
         disabled={isSubmitting}
       >
         {isSubmitting ? 'Ingresando…' : 'Iniciar sesión'}
