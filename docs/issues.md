@@ -9,6 +9,7 @@ Cada ticket incluye criterios de aceptación (CA) y checklist de QA.
 - ✅ **Sprint 2** fue entregado con el wizard de creación sembrando automáticamente categorías, riesgos, checklists, KPIs y gobernanza para nuevos proyectos, más el overview consolidado protegido por permisos.
 - ✅ **Sprint 3** quedó cerrado con solicitudes de información (archivos incluidos), gestión integral de riesgos/hallazgos y flujos de aprobaciones.
 - ✅ **Sprint 4** se cerró con cobertura consolidada (>81 % líneas/statements), métricas publicadas en CI y reforzamiento de observabilidad (CSP, `/metrics`, rate limiting) listo para compartir con stakeholders.
+- 🔄 **Mantenimiento dependencias frontend (12-oct-2025)**: se reinstalaron las dependencias declaradas en `apps/web/package.json` (`npm install`) para asegurar que `node_modules` refleje los paquetes esperados tras integrar Material UI.
 
 La tabla siguiente recoge los entregables inmediatos priorizados para Sprint 4 y sirve como acta de cierre.
 
