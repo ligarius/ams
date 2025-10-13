@@ -26,14 +26,42 @@
       "@/components/*": [
         "src/components/*"
       ],
+      "@/lib/auth/*": [
+        "src/lib/auth/*"
+      ],
       "@/lib/*": [
-        "src/lib/*"
+        "src/lib/*",
+        "../../src/lib/*"
       ],
       "@/theme": [
         "src/theme"
       ],
       "@/styles/*": [
         "src/styles/*"
+      ],
+      "@/config/*": [
+        "src/config/*",
+        "../../src/config/*"
+      ],
+      "@/utils/*": [
+        "src/utils/*",
+        "../../src/utils/*"
+      ],
+      "@/services/*": [
+        "src/services/*",
+        "../../src/services/*"
+      ],
+      "@/middleware/*": [
+        "src/middleware/*",
+        "../../src/middleware/*"
+      ],
+      "@/routes/*": [
+        "src/routes/*",
+        "../../src/routes/*"
+      ],
+      "@/server": [
+        "src/server",
+        "../../src/server"
       ],
       "@backend/*": [
         "../../src/*"
