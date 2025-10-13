@@ -7,7 +7,7 @@ type Highlight = {
   icon: ReactNode;
 };
 
-const iconClasses = "h-6 w-6 text-cyan-300";
+const iconClasses = "h-5 w-5 text-cyan-600";
 
 const highlights: Highlight[] = [
   {
@@ -66,51 +66,46 @@ const highlights: Highlight[] = [
 
 export function LoginHero() {
   return (
-    <div className="space-y-10">
-      <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1 text-xs font-medium uppercase tracking-[0.2em] text-cyan-200/80">
-        <span className="h-2 w-2 rounded-full bg-cyan-400" />
+    <div className="flex flex-col gap-12">
+      <div className="inline-flex w-fit items-center gap-2 rounded-full border border-cyan-100 bg-cyan-50 px-4 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-cyan-600">
+        <span className="h-2 w-2 rounded-full bg-cyan-500" />
         Plataforma AMS
       </div>
 
       <div className="space-y-6">
-        <h1 className="text-3xl font-semibold text-white sm:text-4xl">
+        <h1 className="text-3xl font-semibold text-slate-900 sm:text-4xl">
           Auditoría moderna con trazabilidad total
         </h1>
-        <p className="text-base text-slate-200/80 sm:text-lg">
-          Centraliza equipos, proyectos y controles en una única experiencia colaborativa, diseñada para cumplir normativas y acortar cierres de auditoría.
+        <p className="text-base text-slate-600 sm:text-lg">
+          Centraliza equipos, proyectos y controles en una única experiencia colaborativa, diseñada para cumplir normativas y
+          acortar cierres de auditoría.
         </p>
       </div>
 
-      <ul className="space-y-4">
+      <ul className="grid gap-4 sm:grid-cols-2">
         {highlights.map((item) => (
           <li
             key={item.title}
-            className="flex items-start gap-4 rounded-2xl border border-white/5 bg-white/5 p-4 shadow-lg shadow-slate-900/20 backdrop-blur"
+            className="flex items-start gap-4 rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm shadow-slate-200"
           >
-            <span
-              className="mt-1 inline-flex h-9 w-9 items-center justify-center rounded-xl bg-cyan-400/10 text-cyan-300"
-              aria-hidden
-            >
+            <span className="mt-1 inline-flex h-9 w-9 items-center justify-center rounded-xl bg-cyan-50 text-cyan-600" aria-hidden>
               {item.icon}
             </span>
-            <div>
-              <p className="text-sm font-semibold text-white">{item.title}</p>
-              <p className="text-sm text-slate-200/70">{item.description}</p>
+            <div className="space-y-1">
+              <p className="text-sm font-semibold text-slate-900">{item.title}</p>
+              <p className="text-sm text-slate-600">{item.description}</p>
             </div>
           </li>
         ))}
       </ul>
 
-      <div className="relative overflow-hidden rounded-3xl border border-white/5 bg-gradient-to-br from-white/10 via-white/5 to-transparent p-6 shadow-xl shadow-cyan-500/10">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.35),_transparent_55%)]" aria-hidden />
-        <div className="relative flex items-center gap-4">
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-950/60">
-            <Image src="/brand/ams-glyph.svg" alt="AMS" width={48} height={48} />
-          </div>
-          <div className="space-y-1">
-            <p className="text-sm font-semibold text-white">Confianza Fortune 500</p>
-            <p className="text-xs text-slate-200/70">+120 empresas reguladas operan auditorías críticas en AMS.</p>
-          </div>
+      <div className="flex flex-wrap items-center gap-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-lg">
+        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100">
+          <Image src="/brand/ams-glyph.svg" alt="AMS" width={40} height={40} />
+        </div>
+        <div className="space-y-1">
+          <p className="text-sm font-semibold text-slate-900">Confianza Fortune 500</p>
+          <p className="text-sm text-slate-600">+120 empresas reguladas operan auditorías críticas en AMS.</p>
         </div>
       </div>
     </div>
