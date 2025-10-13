@@ -46,6 +46,10 @@ export const clearSessionCookie = async () => {
   cookies().delete(SESSION_COOKIE);
 };
 
+interface EnsureSessionOptions {
+  mutateCookies?: boolean;
+}
+
 export const getSession = async (): Promise<SessionPayload | null> => {
   const raw = cookies().get(SESSION_COOKIE)?.value;
   if (!raw) {
@@ -68,7 +72,13 @@ const isTokenExpired = (token: string): boolean => {
   }
 };
 
-const refreshSession = async (session: SessionPayload): Promise<SessionPayload | null> => {
+const refreshSession = async (
+  session: SessionPayload,
+  options: EnsureSessionOptions
+): Promise<SessionPayload | null> => {
+  if (!options.mutateCookies) {
+    return null;
+  }
   try {
     const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
       method: 'POST',
@@ -85,16 +95,22 @@ const refreshSession = async (session: SessionPayload): Promise<SessionPayload |
       refreshToken: result.refreshToken,
       user: result.user,
     };
-    await setSessionCookie(updated);
+    if (options.mutateCookies) {
+      await setSessionCookie(updated);
+    }
     return updated;
   } catch (error) {
     console.warn('Unable to refresh session', error);
-    await clearSessionCookie();
+    if (options.mutateCookies) {
+      await clearSessionCookie();
+    }
     return null;
   }
 };
 
-export const ensureSession = async (): Promise<SessionPayload | null> => {
+export const ensureSession = async (
+  options: EnsureSessionOptions = {}
+): Promise<SessionPayload | null> => {
   const existing = await getSession();
   if (!existing) {
     return null;
@@ -102,7 +118,7 @@ export const ensureSession = async (): Promise<SessionPayload | null> => {
   if (!isTokenExpired(existing.accessToken)) {
     return existing;
   }
-  return refreshSession(existing);
+  return refreshSession(existing, options);
 };
 
 export const getSessionUser = async (): Promise<SessionUser | null> => {
