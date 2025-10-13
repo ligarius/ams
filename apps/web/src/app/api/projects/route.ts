@@ -1,3 +1,4 @@
+import { revalidatePath } from 'next/cache';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { ensureSession, clearSessionCookie } from '@/lib/auth/session';
@@ -92,6 +93,8 @@ export async function POST(request: Request) {
 
   try {
     const project = await createProject(parsed.data, actor);
+    revalidatePath('/projects');
+    revalidatePath('/dashboard');
     return NextResponse.json(project, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {
