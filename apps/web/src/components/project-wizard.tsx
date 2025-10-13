@@ -1,8 +1,9 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Controller, useFieldArray, useForm } from 'react-hook-form';
+import { AUDIT_FRAMEWORK_DEFINITIONS, AUDIT_FRAMEWORK_VALUES, DEFAULT_AUDIT_FRAMEWORK_SELECTION } from '@/config/auditFrameworks';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
@@ -11,7 +12,12 @@ import {
   Alert,
   Box,
   Button,
+  Checkbox,
+  Chip,
   Divider,
+  FormControl,
+  FormGroup,
+  FormHelperText,
   Grid,
   IconButton,
   MenuItem,
@@ -29,6 +35,19 @@ const riskLevels = [
   { value: 'MEDIUM', label: 'Medio' },
   { value: 'HIGH', label: 'Alto' },
 ] as const;
+
+const auditFrameworkEnum = z.enum(AUDIT_FRAMEWORK_VALUES);
+
+const auditFrameworkOptions = AUDIT_FRAMEWORK_VALUES.map((value) => ({
+  value,
+  label: AUDIT_FRAMEWORK_DEFINITIONS[value].label,
+  description: AUDIT_FRAMEWORK_DEFINITIONS[value].description,
+}));
+
+type CompanyOption = {
+  id: number;
+  name: string;
+};
 
 const wizardSchema = z.object({
   companyId: z
@@ -101,6 +120,9 @@ const wizardSchema = z.object({
       })
     )
     .min(1, 'Registra al menos un riesgo inicial'),
+  frameworks: z
+    .array(auditFrameworkEnum)
+    .min(1, 'Selecciona al menos un marco de auditoría'),
 });
 
 export type ProjectWizardValues = z.infer<typeof wizardSchema>;
@@ -125,6 +147,7 @@ const defaultValues: ProjectWizardValues = {
       impact: 'MEDIUM',
     },
   ],
+  frameworks: DEFAULT_AUDIT_FRAMEWORK_SELECTION,
 };
 
 const steps = [
@@ -144,6 +167,11 @@ const steps = [
     fields: ['stakeholders', 'milestones'] as const,
   },
   {
+    label: 'Marcos de auditoría',
+    description: 'Activa los procesos y marcos de referencia que guiarán la revisión.',
+    fields: ['frameworks'] as const,
+  },
+  {
     label: 'Riesgos y confirmación',
     description: 'Prioriza riesgos iniciales y confirma el resumen antes de crear el proyecto.',
     fields: ['risks'] as const,
@@ -155,12 +183,17 @@ export function ProjectWizard() {
   const [activeStep, setActiveStep] = useState(0);
   const [serverError, setServerError] = useState<string | null>(null);
   const [createdProjectName, setCreatedProjectName] = useState<string | null>(null);
+  const [companies, setCompanies] = useState<CompanyOption[]>([]);
+  const [isLoadingCompanies, setIsLoadingCompanies] = useState(true);
+  const [companyError, setCompanyError] = useState<string | null>(null);
 
   const {
     control,
     handleSubmit,
     register,
     reset,
+    setValue,
+    getValues,
     trigger,
     watch,
     formState: { errors, isSubmitting },
@@ -196,6 +229,10 @@ export function ProjectWizard() {
         likelihood: watchedValues.risks?.[index]?.likelihood ?? field.likelihood,
         impact: watchedValues.risks?.[index]?.impact ?? field.impact,
       })),
+      frameworks: (watchedValues.frameworks ?? defaultValues.frameworks).map((value) => ({
+        value,
+        label: AUDIT_FRAMEWORK_DEFINITIONS[value].label,
+      })),
     };
   }, [
     milestonesArray.fields,
@@ -206,7 +243,50 @@ export function ProjectWizard() {
     watchedValues.objectives,
     watchedValues.risks,
     watchedValues.stakeholders,
+    watchedValues.frameworks,
   ]);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadCompanies = async () => {
+      setIsLoadingCompanies(true);
+      try {
+        const response = await fetch('/api/companies');
+        if (!response.ok) {
+          throw new Error('Failed to load companies');
+        }
+        const data = (await response.json()) as CompanyOption[];
+        if (!active) {
+          return;
+        }
+        setCompanies(data);
+        setCompanyError(null);
+        if (data.length > 0) {
+          const selected = getValues('companyId');
+          const exists = data.some((company) => company.id.toString() === selected);
+          if (!selected || !exists) {
+            setValue('companyId', data[0].id.toString(), { shouldValidate: true });
+          }
+        }
+      } catch (error) {
+        if (!active) {
+          return;
+        }
+        setCompanyError('No se pudieron cargar las compañías. Ingresa el ID manualmente.');
+      } finally {
+        if (active) {
+          setIsLoadingCompanies(false);
+        }
+      }
+    };
+
+    loadCompanies();
+
+    return () => {
+      active = false;
+    };
+  }, [getValues, setValue]);
 
   const handleNext = async () => {
     setServerError(null);
@@ -248,6 +328,7 @@ export function ProjectWizard() {
           likelihood: item.likelihood,
           impact: item.impact,
         })),
+        frameworks: values.frameworks,
       },
     };
 
@@ -337,15 +418,48 @@ export function ProjectWizard() {
               <Stack spacing={3}>
                 <Grid container spacing={3}>
                   <Grid item xs={12} md={4}>
-                    <TextField
-                      label="ID de la compañía"
-                      type="number"
-                      fullWidth
-                      inputProps={{ min: 1 }}
-                      helperText={errors.companyId?.message ?? 'Acme Corp usa el ID 1 según las semillas iniciales.'}
-                      error={Boolean(errors.companyId)}
-                      {...register('companyId')}
-                    />
+                    {(!companyError && (companies.length > 0 || isLoadingCompanies)) ? (
+                      <TextField
+                        select
+                        fullWidth
+                        label="Compañía"
+                        disabled={isLoadingCompanies && companies.length === 0}
+                        helperText={
+                          errors.companyId?.message ||
+                          (isLoadingCompanies
+                            ? 'Cargando compañías disponibles...'
+                            : 'Selecciona la compañía responsable de la auditoría.')
+                        }
+                        error={Boolean(errors.companyId)}
+                        {...register('companyId')}
+                      >
+                        {isLoadingCompanies && companies.length === 0 ? (
+                          <MenuItem value={watchedValues.companyId ?? ''} disabled>
+                            Cargando compañías...
+                          </MenuItem>
+                        ) : (
+                          companies.map((company) => (
+                            <MenuItem key={company.id} value={company.id.toString()}>
+                              {company.name} (ID {company.id})
+                            </MenuItem>
+                          ))
+                        )}
+                      </TextField>
+                    ) : (
+                      <TextField
+                        label="ID de la compañía"
+                        type="number"
+                        fullWidth
+                        inputProps={{ min: 1 }}
+                        helperText={
+                          companyError ??
+                          errors.companyId?.message ??
+                          'Ingresa el ID numérico de la compañía objetivo.'
+                        }
+                        error={Boolean(errors.companyId) || Boolean(companyError)}
+                        {...register('companyId')}
+                      />
+                    )}
                   </Grid>
                   <Grid item xs={12} md={8}>
                     <TextField
@@ -523,8 +637,64 @@ export function ProjectWizard() {
                 </Stack>
               </Stack>
             )}
-
             {activeStep === 3 && (
+              <Stack spacing={3}>
+                <Stack spacing={1}>
+                  <Typography variant="subtitle2">Marcos y checklist</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Selecciona los marcos más relevantes para activar el checklist inicial del proyecto.
+                  </Typography>
+                </Stack>
+                <Controller
+                  control={control}
+                  name="frameworks"
+                  render={({ field }) => {
+                    const selected = field.value ?? [];
+                    return (
+                      <FormControl component="fieldset" error={Boolean(errors.frameworks)}>
+                        <FormGroup>
+                          <Stack spacing={2}>
+                            {auditFrameworkOptions.map((option) => {
+                              const checked = selected.includes(option.value);
+                              return (
+                                <Stack key={option.value} direction="row" spacing={1.5} alignItems="flex-start">
+                                  <Checkbox
+                                    checked={checked}
+                                    onChange={(event) => {
+                                      const isChecked = event.target.checked;
+                                      if (isChecked) {
+                                        field.onChange([...selected, option.value]);
+                                      } else {
+                                        field.onChange(selected.filter((value) => value !== option.value));
+                                      }
+                                    }}
+                                  />
+                                  <Stack spacing={0.5}>
+                                    <Typography variant="body2" fontWeight={600}>
+                                      {option.label}
+                                    </Typography>
+                                    <Typography variant="body2" color="text.secondary">
+                                      {option.description}
+                                    </Typography>
+                                  </Stack>
+                                </Stack>
+                              );
+                            })}
+                          </Stack>
+                        </FormGroup>
+                        <FormHelperText>
+                          {errors.frameworks?.message ??
+                            'Marca los marcos que reflejan el tipo de auditoría y procesos a activar.'}
+                        </FormHelperText>
+                      </FormControl>
+                    );
+                  }}
+                />
+              </Stack>
+            )}
+
+
+            {activeStep === 4 && (
               <Stack spacing={4}>
                 <Stack spacing={1}>
                   <Typography variant="subtitle2">Riesgos iniciales</Typography>
@@ -677,6 +847,17 @@ export function ProjectWizard() {
                           </Typography>{' '}
                           — {milestone.dueDate ? new Date(milestone.dueDate).toLocaleDateString() : 'Sin fecha definida'}
                         </Typography>
+                      ))}
+                    </Stack>
+
+                    <Divider flexItem />
+
+                    <Typography variant="subtitle1" fontWeight={600}>
+                      Marcos activados
+                    </Typography>
+                    <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                      {summary.frameworks.map((framework) => (
+                        <Chip key={framework.value} label={framework.label} size="small" color="primary" variant="outlined" />
                       ))}
                     </Stack>
 

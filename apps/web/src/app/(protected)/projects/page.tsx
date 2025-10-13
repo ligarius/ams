@@ -1,8 +1,17 @@
+import {
+  AUDIT_FRAMEWORK_DEFINITIONS,
+  AUDIT_FRAMEWORK_VALUES,
+  type AuditFrameworkId,
+} from '@backend/config/auditFrameworks';
+import prisma from '@backend/lib/prisma';
+import { listProjects } from '@backend/services/projectService';
 import { ensureSession } from '@/lib/auth/session';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import NextLink from 'next/link';
 import {
   Button,
+  Chip,
+  Divider,
   List,
   ListItem,
   ListItemIcon,
@@ -19,8 +28,56 @@ const projectSteps = [
   'Lanzamiento de solicitudes de información',
 ];
 
+const dateFormatter = new Intl.DateTimeFormat('es-ES', { dateStyle: 'medium' });
+
 export default async function ProjectsPage() {
   const session = await ensureSession();
+  const actor = session ? await prisma.user.findUnique({ where: { id: session.user.id } }) : null;
+
+  let projects: Array<{
+    id: number;
+    name: string;
+    description: string;
+    companyName: string;
+    createdAt: Date;
+    frameworks: AuditFrameworkId[];
+  }> = [];
+
+  if (actor) {
+    const [rawProjects, companies] = await Promise.all([
+      listProjects(actor),
+      prisma.company.findMany(),
+    ]);
+
+    const companyById = new Map(companies.map((company) => [company.id, company.name]));
+    const sortedProjects = [...rawProjects].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+
+    const frameworksByProject = new Map<number, AuditFrameworkId[]>();
+    await Promise.all(
+      sortedProjects.map(async (project) => {
+        const checklists = await prisma.projectChecklist.findMany({ where: { projectId: project.id } });
+        const frameworks = new Set<AuditFrameworkId>();
+        for (const frameworkId of AUDIT_FRAMEWORK_VALUES) {
+          const label = AUDIT_FRAMEWORK_DEFINITIONS[frameworkId].label;
+          const prefix = `[Framework: ${label}]`;
+          if (checklists.some((item) => item.name.startsWith(prefix))) {
+            frameworks.add(frameworkId);
+          }
+        }
+        frameworksByProject.set(project.id, Array.from(frameworks));
+      })
+    );
+
+    projects = sortedProjects.map((project) => ({
+      id: project.id,
+      name: project.name,
+      description: project.description ?? 'Sin descripción registrada.',
+      companyName: companyById.get(project.companyId) ?? `Compañía #${project.companyId}`,
+      createdAt: project.createdAt instanceof Date ? project.createdAt : new Date(project.createdAt),
+      frameworks: frameworksByProject.get(project.id) ?? [],
+    }));
+  }
+
   return (
     <Stack spacing={6}>
       <Stack spacing={1.5}>
@@ -58,11 +115,72 @@ export default async function ProjectsPage() {
         </List>
       </Paper>
 
-      <Paper variant="outlined" sx={{ p: 3.5, borderStyle: 'dashed', borderWidth: 2 }}>
-        <Typography variant="body2" color="text.secondary">
-          ¡Hola {session?.user.email}! Próximamente aquí verás el listado de proyectos consultando el endpoint protegido del backend.
-          El sprint actual se centra en dejar lista la autenticación y la estructura de layout.
-        </Typography>
+      <Paper variant="outlined" sx={{ p: 3.5 }}>
+        <Stack spacing={3}>
+          <Stack
+            direction={{ xs: 'column', sm: 'row' }}
+            spacing={1}
+            alignItems={{ xs: 'flex-start', sm: 'center' }}
+            justifyContent="space-between"
+          >
+            <Typography variant="h6">Auditorías registradas</Typography>
+            {projects.length > 0 && (
+              <Typography variant="body2" color="text.secondary">
+                {projects.length} {projects.length === 1 ? 'proyecto' : 'proyectos'} activos
+              </Typography>
+            )}
+          </Stack>
+
+          {projects.length === 0 ? (
+            <Typography variant="body2" color="text.secondary">
+              {session?.user
+                ? 'Aún no has registrado auditorías. Usa el botón “Crear nueva auditoría” para sembrar automáticamente checklist, KPIs y gobernanza de inicio.'
+                : 'Inicia sesión nuevamente para consultar tus auditorías.'}
+            </Typography>
+          ) : (
+            <Stack spacing={3} divider={<Divider flexItem />}>
+              {projects.map((project) => (
+                <Stack key={project.id} spacing={1.5}>
+                  <Stack
+                    direction={{ xs: 'column', sm: 'row' }}
+                    spacing={1}
+                    alignItems={{ xs: 'flex-start', sm: 'baseline' }}
+                    justifyContent="space-between"
+                  >
+                    <Typography variant="subtitle1" fontWeight={600}>
+                      {project.name}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Registrado el {dateFormatter.format(project.createdAt)}
+                    </Typography>
+                  </Stack>
+
+                  <Typography variant="body2" color="text.secondary">
+                    {project.description}
+                  </Typography>
+
+                  <Typography variant="body2">
+                    <strong>Compañía:</strong> {project.companyName}
+                  </Typography>
+
+                  {project.frameworks.length > 0 && (
+                    <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                      {project.frameworks.map((frameworkId) => (
+                        <Chip
+                          key={frameworkId}
+                          label={AUDIT_FRAMEWORK_DEFINITIONS[frameworkId].label}
+                          size="small"
+                          color="primary"
+                          variant="outlined"
+                        />
+                      ))}
+                    </Stack>
+                  )}
+                </Stack>
+              ))}
+            </Stack>
+          )}
+        </Stack>
       </Paper>
     </Stack>
   );
