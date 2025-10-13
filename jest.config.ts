@@ -10,6 +10,7 @@ const config: Config = {
   moduleFileExtensions: ['ts', 'js', 'json'],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
+    '^next/headers$': '<rootDir>/tests/mocks/next-headers',
   },
   testPathIgnorePatterns: ['<rootDir>/tests/e2e'],
 };

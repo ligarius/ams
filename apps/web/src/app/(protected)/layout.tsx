@@ -1,5 +1,5 @@
-import { ensureSession } from '@/lib/auth/session';
 import { redirect } from 'next/navigation';
+import { fetchServerSession } from '@/lib/auth/server-session';
 import { SessionProvider } from '@/components/session-provider';
 import { Navigation } from '@/components/navigation';
 import { Box, Container } from '@mui/material';
@@ -9,7 +9,7 @@ export default async function ProtectedLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const session = await ensureSession();
+  const session = await fetchServerSession();
   if (!session) {
     redirect('/login');
   }
