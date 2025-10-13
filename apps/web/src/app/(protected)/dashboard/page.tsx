@@ -1,5 +1,5 @@
 import NextLink from 'next/link';
-import { ensureSession } from '@/lib/auth/session';
+import { fetchServerSession } from '@/lib/auth/server-session';
 import {
   Card,
   CardActionArea,
@@ -29,7 +29,7 @@ const cards = [
 ];
 
 export default async function DashboardPage() {
-  const session = await ensureSession();
+  const session = await fetchServerSession();
   return (
     <Stack spacing={6}>
       <Stack spacing={1.5}>

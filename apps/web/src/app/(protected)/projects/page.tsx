@@ -5,7 +5,7 @@ import {
 } from '@backend/config/auditFrameworks';
 import prisma from '@backend/lib/prisma';
 import { listProjects } from '@backend/services/projectService';
-import { ensureSession } from '@/lib/auth/session';
+import { fetchServerSession } from '@/lib/auth/server-session';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import NextLink from 'next/link';
 import {
@@ -31,7 +31,7 @@ const projectSteps = [
 const dateFormatter = new Intl.DateTimeFormat('es-ES', { dateStyle: 'medium' });
 
 export default async function ProjectsPage() {
-  const session = await ensureSession();
+  const session = await fetchServerSession();
   const actor = session ? await prisma.user.findUnique({ where: { id: session.user.id } }) : null;
 
   let projects: Array<{
@@ -134,7 +134,7 @@ export default async function ProjectsPage() {
           {projects.length === 0 ? (
             <Typography variant="body2" color="text.secondary">
               {session?.user
-                ? 'Aún no has registrado auditorías. Usa el botón “Crear nueva auditoría” para sembrar automáticamente checklist, KPIs y gobernanza de inicio.'
+                ? 'Aún no has registrado auditorías. Usa el botón “Crear nueva auditoría” para sembrar automáticamente checklists, KPIs y gobernanza de inicio.'
                 : 'Inicia sesión nuevamente para consultar tus auditorías.'}
             </Typography>
           ) : (
