@@ -28,7 +28,7 @@ npm install
 - `npm run test:e2e`: ejecuta la suite de Playwright que recorre login, wizard, data request y aprobación.
 - `npm run accept`: ejecuta lint, typecheck y pruebas (QA del sprint).
 
-## Frontend (Sprint F1)
+## Frontend (Sprints F1 y F2)
 
 El frontend en Next.js vive en [`apps/web`](apps/web). Para ejecutarlo localmente:
 
@@ -42,6 +42,8 @@ Configura la variable `API_BASE_URL` si el backend corre en una URL distinta a `
 
 El Sprint F1 entrega el formulario de login con validaciones, persistencia de sesión mediante cookies HTTP-only, middleware de
 rutas protegidas y un layout principal con navegación hacia los módulos clave (dashboard, proyectos, solicitudes y aprobaciones).
+El Sprint F2 suma el wizard de creación de auditorías en `/projects/new`, validaciones con Zod, envío autenticado hacia el
+endpoint `POST /api/projects` y un resumen previo a la creación con objetivos, stakeholders, hitos y riesgos iniciales.
 
 ## Endpoints principales
 

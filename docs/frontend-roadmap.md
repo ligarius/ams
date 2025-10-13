@@ -47,8 +47,8 @@ Diseñar y entregar una interfaz web robusta que consuma el backend existente de
 ## Roadmap propuesto de sprints (frontend)
 | Sprint | Objetivo | Entregables principales | QA/Checks |
 | --- | --- | --- | --- |
-| **F1** | Autenticación y layout base | Login, registro de sesión, layout protegido, navegación principal | Lint, unit tests auth, e2e login |
-| **F2** | Wizard de proyectos | Pasos del wizard, validaciones Zod compartidas, integración con `POST /projects` | Tests de formularios, e2e creación proyecto |
+| **F1** ✅ | Autenticación y layout base | Login, registro de sesión, layout protegido, navegación principal | Lint, unit tests auth, e2e login |
+| **F2** ✅ | Wizard de proyectos | Pasos del wizard, validaciones Zod compartidas, integración con `POST /projects` | Tests de formularios, e2e creación proyecto |
 | **F3** | Overview y dashboards | Página `/projects/:id`, componentes de KPIs, estado global | Testing Library + Playwright overview |
 | **F4** | Solicitudes de información | CRUD UI, subida de archivos, cola de reintentos | Tests de subida (MSW), e2e data request |
 | **F5** | Riesgos y hallazgos | Vistas con tablas/kanban, linking cruzado, filtros avanzados | Visual regression, e2e riesgo→hallazgo |

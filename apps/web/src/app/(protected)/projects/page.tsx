@@ -1,6 +1,8 @@
 import { ensureSession } from '@/lib/auth/session';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
+import NextLink from 'next/link';
 import {
+  Button,
   List,
   ListItem,
   ListItemIcon,
@@ -27,9 +29,17 @@ export default async function ProjectsPage() {
         </Typography>
         <Typography variant="h4">Tus auditorías activas</Typography>
         <Typography variant="body2" color="text.secondary" maxWidth={600}>
-          Centraliza la creación y seguimiento de auditorías. Esta sección se conectará con el wizard y overview del backend para
-          mostrar KPIs, riesgos prioritarios y gobernanza.
+          Centraliza la creación y seguimiento de auditorías. Desde aquí puedes iniciar el wizard para crear nuevas auditorías y
+          posteriormente consultar el overview consolidado que entrega el backend.
         </Typography>
+        <Button
+          component={NextLink}
+          href="/projects/new"
+          variant="contained"
+          sx={{ alignSelf: { xs: 'stretch', sm: 'flex-start' } }}
+        >
+          Crear nueva auditoría
+        </Button>
       </Stack>
 
       <Paper variant="outlined" sx={{ p: 3.5 }}>
