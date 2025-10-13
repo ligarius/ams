@@ -1,3 +1,4 @@
+import { cache } from 'react';
 import { cookies, headers } from 'next/headers';
 import type { SessionPayload } from './session';
 
@@ -29,7 +30,7 @@ const buildCookieHeader = () => {
   return entries.map(({ name, value }) => `${name}=${value}`).join('; ');
 };
 
-export const fetchServerSession = async (): Promise<SessionPayload | null> => {
+const fetchServerSessionUncached = async (): Promise<SessionPayload | null> => {
   const baseUrl = getBaseUrl();
   const cookieHeader = buildCookieHeader();
   const response = await fetch(`${baseUrl}/api/auth/session`, {
@@ -56,3 +57,5 @@ export const fetchServerSession = async (): Promise<SessionPayload | null> => {
 
   return body.session;
 };
+
+export const fetchServerSession = cache(fetchServerSessionUncached);
