@@ -18,22 +18,22 @@
     "isolatedModules": true,
     "noEmit": true,
     "jsx": "preserve",
-    "baseUrl": "./src",
+    "baseUrl": ".",
     "paths": {
       "@/app/*": [
-        "app/*"
+        "src/app/*"
       ],
       "@/components/*": [
-        "components/*"
+        "src/components/*"
       ],
       "@/lib/*": [
-        "lib/*"
+        "src/lib/*"
       ],
       "@/theme": [
-        "theme"
+        "src/theme"
       ],
       "@/styles/*": [
-        "styles/*"
+        "src/styles/*"
       ]
     },
     "types": [
