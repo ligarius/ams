@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   AUDIT_FRAMEWORK_DEFINITIONS,
+  AUDIT_FRAMEWORKS,
   AUDIT_FRAMEWORK_VALUES,
   DEFAULT_AUDIT_FRAMEWORK_SELECTION,
   type AuditFrameworkId,
@@ -16,13 +17,15 @@ import prisma, {
   User,
 } from '@/lib/prisma';
 
+const RISK_LEVELS: RiskLevel[] = ['LOW', 'MEDIUM', 'HIGH'];
+
 const isoDateSchema = z
   .string()
   .min(1)
   .refine((value) => !Number.isNaN(Date.parse(value)), { message: 'Invalid date format' })
   .transform((value) => new Date(value));
 
-const riskLevelSchema = z.enum(['LOW', 'MEDIUM', 'HIGH']);
+const riskLevelSchema = z.enum(RISK_LEVELS);
 
 const wizardStakeholderSchema = z.object({
   name: z.string().min(2),
@@ -87,7 +90,7 @@ type WizardRisk = {
   impact: RiskLevel;
 };
 
-type WizardStakeholder = {
+export type WizardStakeholder = {
   name: string;
   role: string;
 };
@@ -99,6 +102,28 @@ type ResolvedWizardData = {
   stakeholders: WizardStakeholder[];
   frameworks: AuditFrameworkId[];
 };
+
+export interface ProjectWizardConfig {
+  frameworks: Array<{
+    id: AuditFrameworkId;
+    label: string;
+    description: string;
+    checklist: readonly string[];
+  }>;
+  defaults: {
+    objectives: string[];
+    milestones: Array<{ name: string; dueDate: string }>;
+    risks: Array<{
+      title: string;
+      description: string | null;
+      likelihood: RiskLevel;
+      impact: RiskLevel;
+    }>;
+    stakeholders: WizardStakeholder[];
+    frameworks: AuditFrameworkId[];
+  };
+  riskLevels: RiskLevel[];
+}
 
 const addDays = (days: number): Date => {
   const base = new Date();
@@ -386,6 +411,35 @@ export const createProject = async (payload: unknown, actor: User): Promise<Proj
   });
 
   return project;
+};
+
+export const getProjectWizardConfig = (): ProjectWizardConfig => {
+  const defaults = resolveWizardData(undefined);
+
+  return {
+    frameworks: AUDIT_FRAMEWORKS.map((framework) => ({
+      id: framework.id,
+      label: framework.label,
+      description: framework.description,
+      checklist: framework.checklist,
+    })),
+    defaults: {
+      objectives: [...defaults.objectives],
+      milestones: defaults.milestones.map((milestone) => ({
+        name: milestone.name,
+        dueDate: milestone.dueDate.toISOString(),
+      })),
+      risks: defaults.risks.map((risk) => ({
+        title: risk.title,
+        description: risk.description ?? null,
+        likelihood: risk.likelihood,
+        impact: risk.impact,
+      })),
+      stakeholders: defaults.stakeholders.map((stakeholder) => ({ ...stakeholder })),
+      frameworks: [...defaults.frameworks],
+    },
+    riskLevels: [...RISK_LEVELS],
+  };
 };
 
 export const updateProject = async (projectId: number, payload: unknown, actor: User): Promise<Project> => {

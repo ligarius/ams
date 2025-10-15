@@ -2,7 +2,13 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { authenticate, AuthenticatedRequest } from '@/middleware/authentication';
 import { DataRequestStatus } from '@/lib/prisma';
-import { createProject, getProjectOverview, listProjects, updateProject } from '@/services/projectService';
+import {
+  createProject,
+  getProjectOverview,
+  getProjectWizardConfig,
+  listProjects,
+  updateProject,
+} from '@/services/projectService';
 import {
   addDataRequestAttachment,
   createDataRequest,
@@ -49,6 +55,17 @@ router.post('/', async (req: AuthenticatedRequest, res) => {
     }
     return res.status(500).json({ message: 'Unexpected error' });
   }
+});
+
+router.get('/wizard/config', (req: AuthenticatedRequest, res) => {
+  if (!req.user) {
+    return res.status(401).json({ message: 'Unauthorized' });
+  }
+  if (req.user.role === 'CLIENT') {
+    return res.status(403).json({ message: 'Insufficient permissions' });
+  }
+  const config = getProjectWizardConfig();
+  return res.json(config);
 });
 
 router.get('/:id/overview', async (req: AuthenticatedRequest, res) => {
