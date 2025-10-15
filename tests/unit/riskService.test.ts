@@ -1,6 +1,7 @@
 import bcrypt from 'bcrypt';
 import prisma, { Project, User, resetDatabase } from '@/lib/prisma';
 import { createProject } from '@/services/projectService';
+import { buildPrioritizationMatrix } from '@/services/prioritizationService';
 import {
   listProjectRisks,
   createRisk,
@@ -41,6 +42,8 @@ describe('riskService', () => {
         title: 'Dependencia de terceros',
         likelihood: 'HIGH',
         severity: 'MEDIUM',
+        urgency: 'HIGH',
+        complexity: 'MEDIUM',
         categoryId: category?.id,
         dataRequestId: dataRequest.id,
         process: 'Gestión de proveedores',
@@ -87,6 +90,8 @@ describe('riskService', () => {
           title: 'Riesgo inválido',
           likelihood: 'LOW',
           severity: 'LOW',
+          urgency: 'LOW',
+          complexity: 'MEDIUM',
           categoryId: foreignCategory?.id,
         },
         admin
@@ -113,6 +118,8 @@ describe('riskService', () => {
           title: 'Riesgo cruzado',
           likelihood: 'MEDIUM',
           severity: 'HIGH',
+          urgency: 'HIGH',
+          complexity: 'HIGH',
           dataRequestId: foreignRequest.id,
         },
         admin
@@ -125,6 +132,8 @@ describe('riskService', () => {
         title: 'Riesgo permitido',
         likelihood: 'LOW',
         severity: 'LOW',
+        urgency: 'LOW',
+        complexity: 'LOW',
       },
       admin
     );
@@ -154,6 +163,8 @@ describe('riskService', () => {
           title: 'Riesgo sin permisos',
           likelihood: 'LOW',
           severity: 'MEDIUM',
+          urgency: 'MEDIUM',
+          complexity: 'HIGH',
         },
         client
       )
@@ -167,6 +178,8 @@ describe('riskService', () => {
         title: 'Riesgo operativo',
         likelihood: 'MEDIUM',
         severity: 'HIGH',
+        urgency: 'HIGH',
+        complexity: 'MEDIUM',
         process: 'Proceso inicial',
         system: 'Sistema legado',
       },
@@ -203,6 +216,8 @@ describe('riskService', () => {
         title: 'Riesgo de cumplimiento',
         likelihood: 'MEDIUM',
         severity: 'MEDIUM',
+        urgency: 'MEDIUM',
+        complexity: 'LOW',
       },
       admin
     );
@@ -231,6 +246,8 @@ describe('riskService', () => {
         title: 'Riesgo a monitorear',
         likelihood: 'LOW',
         severity: 'MEDIUM',
+        urgency: 'MEDIUM',
+        complexity: 'MEDIUM',
       },
       admin
     );
@@ -263,5 +280,47 @@ describe('riskService', () => {
         admin
       )
     ).rejects.toThrow('Data request not found');
+  });
+
+  it('prioritizes risks combining impacto, urgencia y complejidad', async () => {
+    const highImpact = await createRisk(
+      project.id,
+      {
+        title: 'Controles críticos sin dueño',
+        likelihood: 'HIGH',
+        severity: 'HIGH',
+        urgency: 'HIGH',
+        complexity: 'LOW',
+      },
+      admin
+    );
+
+    const complexRisk = await createRisk(
+      project.id,
+      {
+        title: 'Remediación con múltiples dependencias',
+        likelihood: 'MEDIUM',
+        severity: 'HIGH',
+        urgency: 'HIGH',
+        complexity: 'HIGH',
+      },
+      admin
+    );
+
+    const risks = await prisma.projectRisk.findMany({ where: { projectId: project.id } });
+    const matrix = buildPrioritizationMatrix(risks);
+
+    const rankedHigh = matrix.ordered.find((item) => item.id === highImpact.id);
+    const rankedComplex = matrix.ordered.find((item) => item.id === complexRisk.id);
+
+    expect(rankedHigh).toBeDefined();
+    expect(rankedComplex).toBeDefined();
+    expect(rankedHigh!.score).toBeGreaterThan(rankedComplex!.score);
+    expect(rankedHigh!.score).toBeCloseTo(3, 2);
+    expect(rankedComplex!.score).toBeCloseTo(2.6, 2);
+
+    const highImpactCell = matrix.matrix.HIGH.HIGH;
+    expect(highImpactCell[0]?.id).toBe(highImpact.id);
+    expect(highImpactCell.some((item) => item.id === complexRisk.id)).toBe(true);
   });
 });

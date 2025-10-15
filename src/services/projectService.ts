@@ -19,6 +19,7 @@ import prisma, {
   RiskStatus,
   User,
 } from '@/lib/prisma';
+import { buildPrioritizationMatrix, type PrioritizationMatrix } from '@/services/prioritizationService';
 
 const RISK_LEVELS: RiskLevel[] = ['LOW', 'MEDIUM', 'HIGH'];
 const DATA_REQUEST_STATUSES: DataRequestStatus[] = ['PENDING', 'IN_REVIEW', 'APPROVED', 'REJECTED'];
@@ -48,6 +49,8 @@ const wizardRiskSchema = z.object({
   description: z.string().min(1).optional(),
   likelihood: riskLevelSchema,
   impact: riskLevelSchema,
+  urgency: riskLevelSchema.optional(),
+  complexity: riskLevelSchema.optional(),
 });
 
 const auditFrameworkEnum = z.enum(AUDIT_FRAMEWORK_VALUES);
@@ -94,6 +97,8 @@ type WizardRisk = {
   description?: string;
   likelihood: RiskLevel;
   impact: RiskLevel;
+  urgency: RiskLevel;
+  complexity: RiskLevel;
 };
 
 export type WizardStakeholder = {
@@ -124,6 +129,8 @@ export interface ProjectWizardConfig {
       description: string | null;
       likelihood: RiskLevel;
       impact: RiskLevel;
+      urgency: RiskLevel;
+      complexity: RiskLevel;
     }>;
     stakeholders: WizardStakeholder[];
     frameworks: AuditFrameworkId[];
@@ -154,12 +161,16 @@ const createDefaultWizardData = (): ResolvedWizardData => ({
       description: 'Los equipos operativos podrían no cargar documentación a tiempo.',
       likelihood: 'MEDIUM',
       impact: 'HIGH',
+      urgency: 'HIGH',
+      complexity: 'MEDIUM',
     },
     {
       title: 'Cambios de alcance sin control',
       description: 'Solicitudes fuera de gobernanza afectan planificación.',
       likelihood: 'LOW',
       impact: 'MEDIUM',
+      urgency: 'MEDIUM',
+      complexity: 'LOW',
     },
   ],
   stakeholders: [
@@ -197,6 +208,8 @@ const resolveWizardData = (wizard: WizardInput | undefined): ResolvedWizardData 
       description: risk.description,
       likelihood: risk.likelihood,
       impact: risk.impact,
+      urgency: risk.urgency ?? 'MEDIUM',
+      complexity: risk.complexity ?? 'MEDIUM',
     })),
     stakeholders: stakeholdersSource.map((stakeholder) => ({
       name: stakeholder.name,
@@ -241,6 +254,8 @@ const seedProjectStructure = async (
         description: risk.description,
         severity: risk.impact,
         likelihood: risk.likelihood,
+        urgency: risk.urgency,
+        complexity: risk.complexity,
         status: 'OPEN',
       },
     });
@@ -403,6 +418,7 @@ export interface ProjectOverview {
       decidedAt: string | null;
     }>;
   };
+  prioritization: PrioritizationMatrix;
 }
 
 export const listProjects = async (user: User): Promise<Project[]> => {
@@ -487,6 +503,8 @@ export const getProjectWizardConfig = (): ProjectWizardConfig => {
         description: risk.description ?? null,
         likelihood: risk.likelihood,
         impact: risk.impact,
+        urgency: risk.urgency,
+        complexity: risk.complexity,
       })),
       stakeholders: defaults.stakeholders.map((stakeholder) => ({ ...stakeholder })),
       frameworks: [...defaults.frameworks],
@@ -523,6 +541,8 @@ export const getProjectOverview = async (projectId: number, actor: User): Promis
     prisma.approval.findMany({ where: { projectId } }),
     prisma.finding.findMany({ where: { projectId } }),
   ]);
+
+  const prioritization = buildPrioritizationMatrix(risks);
 
   const formattedKpis = kpis.map((kpi) => ({
     id: kpi.id,
@@ -652,5 +672,6 @@ export const getProjectOverview = async (projectId: number, actor: User): Promis
       pending: pendingApprovals,
       recent: recentApprovals,
     },
+    prioritization,
   };
 };
