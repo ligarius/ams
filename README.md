@@ -2,6 +2,10 @@
 
 Este repositorio contiene la base del backend para el MVP de Auditoría. Los Sprint 1 y 2 están en producción con autenticación, gestión de usuarios/compañías, middleware de seguridad, wizard de creación y overview consolidado. Con el cierre del Sprint 3 añadimos la operación diaria: solicitudes de información con adjuntos, gestión de riesgos/hallazgos y aprobaciones de cambios de alcance.
 
+## Documentación Sprint 0
+
+- [Sprint 0 — Fundación y Arquitectura](docs/sprint-0-foundation.md): arquitectura de referencia, modelo multi-tenant y lineamientos de CI/CD y backups.
+
 ## Requisitos
 
 - Node.js 20+
@@ -71,6 +75,8 @@ El sistema incluye un usuario administrador inicial:
 - Password: `Admin123!`
 
 También se crea la compañía `Acme Corp` para las pruebas.
+
+Para los cimientos multi-tenant el seed genera el tenant `Acme Consulting`, su área matriz “Oficina Central” y el contrato marco `CNT-0001`, lo que permite comenzar a modelar jerarquías internas y vigencias comerciales desde el Sprint 0.【F:src/lib/prisma.ts†L38-L83】
 
 ## Cómo probar en local
 

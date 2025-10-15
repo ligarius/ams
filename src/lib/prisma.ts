@@ -64,6 +64,43 @@ export type GovernanceType = 'STEERING_COMMITTEE' | 'WORKING_GROUP' | 'SPONSOR_C
 export type DataRequestStatus = 'PENDING' | 'IN_REVIEW' | 'APPROVED' | 'REJECTED';
 export type FindingStatus = 'OPEN' | 'IN_REVIEW' | 'RESOLVED';
 export type ApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+export type TenantStatus = 'ACTIVE' | 'INACTIVE';
+export type ContractStatus = 'DRAFT' | 'ACTIVE' | 'SUSPENDED' | 'CLOSED';
+export type CurrencyCode = 'USD' | 'EUR' | 'CLP' | 'MXN' | 'COP';
+
+export interface Tenant {
+  id: number;
+  name: string;
+  slug: string;
+  industry: string | null;
+  status: TenantStatus;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface TenantArea {
+  id: number;
+  tenantId: number;
+  name: string;
+  description: string | null;
+  parentAreaId: number | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface Contract {
+  id: number;
+  tenantId: number;
+  code: string;
+  title: string;
+  status: ContractStatus;
+  startDate: Date;
+  endDate: Date | null;
+  value: number | null;
+  currency: CurrencyCode | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 export interface ProjectCategory {
   id: number;
@@ -168,6 +205,9 @@ export interface Approval {
 }
 
 interface DatabaseState {
+  tenants: Tenant[];
+  tenantAreas: TenantArea[];
+  contracts: Contract[];
   users: User[];
   companies: Company[];
   projects: Project[];
@@ -187,6 +227,9 @@ interface DatabaseState {
 }
 
 const createEmptyState = (): DatabaseState => ({
+  tenants: [],
+  tenantAreas: [],
+  contracts: [],
   users: [],
   companies: [],
   projects: [],
@@ -229,9 +272,46 @@ const nextId = (model: keyof DatabaseState['sequences']) => {
 const now = () => new Date();
 
 const seed = () => {
+  const tenantId = nextId('tenants');
+  const timestamp = now();
+  const slug = 'acme-consulting';
+  state.tenants.push({
+    id: tenantId,
+    name: 'Acme Consulting',
+    slug,
+    industry: 'Consultoría',
+    status: 'ACTIVE',
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  });
+
+  const corporateAreaId = nextId('tenantAreas');
+  state.tenantAreas.push({
+    id: corporateAreaId,
+    tenantId,
+    name: 'Oficina Central',
+    description: 'Equipo de dirección y soporte corporativo',
+    parentAreaId: null,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  });
+
+  state.contracts.push({
+    id: nextId('contracts'),
+    tenantId,
+    code: 'CNT-0001',
+    title: 'Contrato Marco Servicios Auditoría',
+    status: 'ACTIVE',
+    startDate: timestamp,
+    endDate: null,
+    value: 250000,
+    currency: 'USD',
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  });
+
   const adminId = nextId('users');
   const passwordHash = bcrypt.hashSync('Admin123!', 10);
-  const timestamp = now();
   state.users.push({
     id: adminId,
     email: 'admin@example.com',
@@ -255,7 +335,7 @@ const seed = () => {
     id: nextId('auditLogs'),
     userId: adminId,
     action: 'SEED',
-    metadata: { version: 'sprint-1', env: env.NODE_ENV },
+    metadata: { version: 'sprint-1', env: env.NODE_ENV, tenantSlug: slug },
     createdAt: timestamp,
   });
 };
@@ -274,6 +354,185 @@ if (state.users.length === 0 && Object.keys(state.sequences).length === 0) {
 const logOperation = (model: string, action: string, payload: unknown) => {
   logger.debug({ model, action, payload }, 'db operation');
 };
+
+class TenantModel {
+  async findMany(): Promise<Tenant[]> {
+    return state.tenants.map((tenant) => ({ ...tenant }));
+  }
+
+  async findUnique(params: { where: { id?: number; slug?: string } }): Promise<Tenant | null> {
+    const { id, slug } = params.where;
+    const tenant = state.tenants.find((item) => (id ? item.id === id : true) && (slug ? item.slug === slug : true));
+    return tenant ? { ...tenant } : null;
+  }
+
+  async create(params: { data: { name: string; slug: string; industry?: string | null; status?: TenantStatus } }): Promise<Tenant> {
+    if (state.tenants.some((tenant) => tenant.slug === params.data.slug)) {
+      throw new Error('Tenant slug already exists');
+    }
+    const timestamp = now();
+    const tenant: Tenant = {
+      id: nextId('tenants'),
+      name: params.data.name,
+      slug: params.data.slug,
+      industry: params.data.industry ?? null,
+      status: params.data.status ?? 'ACTIVE',
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+    state.tenants.push(tenant);
+    logOperation('tenant', 'create', { id: tenant.id, slug: tenant.slug });
+    return { ...tenant };
+  }
+
+  async update(params: { where: { id: number }; data: Partial<Omit<Tenant, 'id' | 'createdAt'>> }): Promise<Tenant> {
+    const tenant = state.tenants.find((item) => item.id === params.where.id);
+    if (!tenant) {
+      throw new Error('Tenant not found');
+    }
+    if (params.data.name !== undefined) {
+      tenant.name = params.data.name;
+    }
+    if (params.data.slug !== undefined) {
+      if (state.tenants.some((other) => other.id !== tenant.id && other.slug === params.data.slug)) {
+        throw new Error('Tenant slug already exists');
+      }
+      tenant.slug = params.data.slug;
+    }
+    if (params.data.industry !== undefined) {
+      tenant.industry = params.data.industry;
+    }
+    if (params.data.status !== undefined) {
+      tenant.status = params.data.status;
+    }
+    tenant.updatedAt = now();
+    logOperation('tenant', 'update', { id: tenant.id });
+    return { ...tenant };
+  }
+}
+
+class TenantAreaModel {
+  async findMany(params: { where: { tenantId: number } }): Promise<TenantArea[]> {
+    return state.tenantAreas
+      .filter((area) => area.tenantId === params.where.tenantId)
+      .map((area) => ({ ...area }));
+  }
+
+  async create(params: {
+    data: { tenantId: number; name: string; description?: string | null; parentAreaId?: number | null };
+  }): Promise<TenantArea> {
+    const timestamp = now();
+    const area: TenantArea = {
+      id: nextId('tenantAreas'),
+      tenantId: params.data.tenantId,
+      name: params.data.name,
+      description: params.data.description ?? null,
+      parentAreaId: params.data.parentAreaId ?? null,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+    state.tenantAreas.push(area);
+    logOperation('tenantArea', 'create', { id: area.id, tenantId: area.tenantId });
+    return { ...area };
+  }
+
+  async update(params: {
+    where: { id: number };
+    data: Partial<Pick<TenantArea, 'name' | 'description' | 'parentAreaId'>>;
+  }): Promise<TenantArea> {
+    const area = state.tenantAreas.find((item) => item.id === params.where.id);
+    if (!area) {
+      throw new Error('Tenant area not found');
+    }
+    if (params.data.name !== undefined) {
+      area.name = params.data.name;
+    }
+    if (params.data.description !== undefined) {
+      area.description = params.data.description;
+    }
+    if (params.data.parentAreaId !== undefined) {
+      area.parentAreaId = params.data.parentAreaId;
+    }
+    area.updatedAt = now();
+    logOperation('tenantArea', 'update', { id: area.id });
+    return { ...area };
+  }
+}
+
+class ContractModel {
+  async findMany(params: { where: { tenantId?: number; status?: ContractStatus } }): Promise<Contract[]> {
+    const { tenantId, status } = params.where;
+    return state.contracts
+      .filter((contract) => (tenantId ? contract.tenantId === tenantId : true))
+      .filter((contract) => (status ? contract.status === status : true))
+      .map((contract) => ({ ...contract }));
+  }
+
+  async create(params: {
+    data: {
+      tenantId: number;
+      code: string;
+      title: string;
+      status?: ContractStatus;
+      startDate: Date;
+      endDate?: Date | null;
+      value?: number | null;
+      currency?: CurrencyCode | null;
+    };
+  }): Promise<Contract> {
+    if (state.contracts.some((contract) => contract.code === params.data.code)) {
+      throw new Error('Contract code already exists');
+    }
+    const timestamp = now();
+    const contract: Contract = {
+      id: nextId('contracts'),
+      tenantId: params.data.tenantId,
+      code: params.data.code,
+      title: params.data.title,
+      status: params.data.status ?? 'DRAFT',
+      startDate: params.data.startDate,
+      endDate: params.data.endDate ?? null,
+      value: params.data.value ?? null,
+      currency: params.data.currency ?? null,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+    state.contracts.push(contract);
+    logOperation('contract', 'create', { id: contract.id, code: contract.code });
+    return { ...contract };
+  }
+
+  async update(params: {
+    where: { id: number };
+    data: Partial<Pick<Contract, 'title' | 'status' | 'startDate' | 'endDate' | 'value' | 'currency'>>;
+  }): Promise<Contract> {
+    const contract = state.contracts.find((item) => item.id === params.where.id);
+    if (!contract) {
+      throw new Error('Contract not found');
+    }
+    if (params.data.title !== undefined) {
+      contract.title = params.data.title;
+    }
+    if (params.data.status !== undefined) {
+      contract.status = params.data.status;
+    }
+    if (params.data.startDate !== undefined) {
+      contract.startDate = params.data.startDate;
+    }
+    if (params.data.endDate !== undefined) {
+      contract.endDate = params.data.endDate;
+    }
+    if (params.data.value !== undefined) {
+      contract.value = params.data.value;
+    }
+    if (params.data.currency !== undefined) {
+      contract.currency = params.data.currency;
+    }
+    contract.updatedAt = now();
+    logOperation('contract', 'update', { id: contract.id });
+    return { ...contract };
+  }
+}
 
 class UserModel {
   async findUnique(params: { where: { id?: number; email?: string } }): Promise<User | null> {
@@ -916,6 +1175,9 @@ class RefreshTokenModel {
 }
 
 export class PrismaClient {
+  tenant = new TenantModel();
+  tenantArea = new TenantAreaModel();
+  contract = new ContractModel();
   user = new UserModel();
   company = new CompanyModel();
   project = new ProjectModel();
