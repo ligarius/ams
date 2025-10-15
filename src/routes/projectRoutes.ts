@@ -18,6 +18,13 @@ import {
 } from '@/services/dataRequestService';
 import { createRisk, createFinding, listFindings, listProjectRisks, updateFinding, updateRisk } from '@/services/riskService';
 import { createApproval, listApprovals, transitionApproval } from '@/services/approvalService';
+import {
+  createInitiative,
+  deleteInitiative,
+  getInitiative,
+  listInitiatives,
+  updateInitiative,
+} from '@/services/initiativeService';
 
 const router = Router();
 
@@ -209,6 +216,128 @@ router.post('/:id/data-requests/:dataRequestId/files', async (req: Authenticated
       }
       if (error.message === 'Insufficient permissions') {
         return res.status(403).json({ message: error.message });
+      }
+      return res.status(400).json({ message: error.message });
+    }
+    return res.status(500).json({ message: 'Unexpected error' });
+  }
+});
+
+router.get('/:id/initiatives', async (req: AuthenticatedRequest, res) => {
+  try {
+    const projectId = parseNumericId(req.params.id);
+    const initiatives = await listInitiatives(projectId, req.user!);
+    return res.json(initiatives);
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Invalid identifier') {
+      return res.status(400).json({ message: 'Invalid project id' });
+    }
+    if (error instanceof Error && error.message === 'Insufficient permissions') {
+      return res.status(403).json({ message: error.message });
+    }
+    if (error instanceof Error && error.message === 'Project not found') {
+      return res.status(404).json({ message: error.message });
+    }
+    if (error instanceof Error) {
+      return res.status(400).json({ message: error.message });
+    }
+    return res.status(500).json({ message: 'Unexpected error' });
+  }
+});
+
+router.get('/:id/initiatives/:initiativeId', async (req: AuthenticatedRequest, res) => {
+  try {
+    const projectId = parseNumericId(req.params.id);
+    const initiativeId = parseNumericId(req.params.initiativeId);
+    const initiative = await getInitiative(projectId, initiativeId, req.user!);
+    return res.json(initiative);
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Invalid identifier') {
+      return res.status(400).json({ message: 'Invalid identifier' });
+    }
+    if (error instanceof Error && error.message === 'Insufficient permissions') {
+      return res.status(403).json({ message: error.message });
+    }
+    if (error instanceof Error && error.message === 'Initiative not found') {
+      return res.status(404).json({ message: error.message });
+    }
+    return res.status(500).json({ message: 'Unexpected error' });
+  }
+});
+
+router.post('/:id/initiatives', async (req: AuthenticatedRequest, res) => {
+  try {
+    const projectId = parseNumericId(req.params.id);
+    const initiative = await createInitiative(projectId, req.body, req.user!);
+    return res.status(201).json(initiative);
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Invalid identifier') {
+      return res.status(400).json({ message: 'Invalid project id' });
+    }
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ message: 'Invalid payload', issues: error.flatten() });
+    }
+    if (error instanceof Error) {
+      if (error.message === 'Insufficient permissions') {
+        return res.status(403).json({ message: error.message });
+      }
+      if (error.message === 'Assigned user is not part of the project') {
+        return res.status(400).json({ message: error.message });
+      }
+      if (error.message === 'Project not found') {
+        return res.status(404).json({ message: error.message });
+      }
+      return res.status(400).json({ message: error.message });
+    }
+    return res.status(500).json({ message: 'Unexpected error' });
+  }
+});
+
+router.patch('/:id/initiatives/:initiativeId', async (req: AuthenticatedRequest, res) => {
+  try {
+    const projectId = parseNumericId(req.params.id);
+    const initiativeId = parseNumericId(req.params.initiativeId);
+    const initiative = await updateInitiative(projectId, initiativeId, req.body, req.user!);
+    return res.json(initiative);
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Invalid identifier') {
+      return res.status(400).json({ message: 'Invalid identifier' });
+    }
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ message: 'Invalid payload', issues: error.flatten() });
+    }
+    if (error instanceof Error) {
+      if (error.message === 'Insufficient permissions') {
+        return res.status(403).json({ message: error.message });
+      }
+      if (error.message === 'Assigned user is not part of the project') {
+        return res.status(400).json({ message: error.message });
+      }
+      if (error.message === 'Initiative not found') {
+        return res.status(404).json({ message: error.message });
+      }
+      return res.status(400).json({ message: error.message });
+    }
+    return res.status(500).json({ message: 'Unexpected error' });
+  }
+});
+
+router.delete('/:id/initiatives/:initiativeId', async (req: AuthenticatedRequest, res) => {
+  try {
+    const projectId = parseNumericId(req.params.id);
+    const initiativeId = parseNumericId(req.params.initiativeId);
+    await deleteInitiative(projectId, initiativeId, req.user!);
+    return res.status(204).send();
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Invalid identifier') {
+      return res.status(400).json({ message: 'Invalid identifier' });
+    }
+    if (error instanceof Error) {
+      if (error.message === 'Insufficient permissions') {
+        return res.status(403).json({ message: error.message });
+      }
+      if (error.message === 'Initiative not found') {
+        return res.status(404).json({ message: error.message });
       }
       return res.status(400).json({ message: error.message });
     }
