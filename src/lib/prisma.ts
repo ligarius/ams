@@ -622,6 +622,19 @@ class CompanyModel {
     logOperation('company', 'create', { id: company.id, name: company.name });
     return company;
   }
+
+  async update(params: { where: { id: number }; data: Partial<Pick<Company, 'name'>> }): Promise<Company> {
+    const company = state.companies.find((item) => item.id === params.where.id);
+    if (!company) {
+      throw new Error('Company not found');
+    }
+    if (params.data.name !== undefined) {
+      company.name = params.data.name;
+    }
+    company.updatedAt = now();
+    logOperation('company', 'update', { id: company.id });
+    return { ...company };
+  }
 }
 
 class ProjectModel {
