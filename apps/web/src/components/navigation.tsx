@@ -33,7 +33,7 @@ export function Navigation() {
           <Chip label="AMS" color="primary" variant="outlined" sx={{ letterSpacing: '0.3em', fontWeight: 700 }} />
           <Stack direction="row" spacing={1.5}>
             {links.map((link) => {
-              const isActive = pathname === link.href;
+              const isActive = pathname === link.href || pathname.startsWith(`${link.href}/`);
               return (
                 <Button
                   key={link.href}

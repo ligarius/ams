@@ -176,6 +176,16 @@ export default async function ProjectsPage() {
                       ))}
                     </Stack>
                   )}
+
+                  <Button
+                    component={NextLink}
+                    href={`/projects/${project.id}`}
+                    size="small"
+                    variant="text"
+                    sx={{ alignSelf: 'flex-start', fontWeight: 600 }}
+                  >
+                    Ver overview
+                  </Button>
                 </Stack>
               ))}
             </Stack>
