@@ -77,6 +77,61 @@ describe('API integration', () => {
     expect(patchResponse.body.role).toBe('CLIENT');
   });
 
+  it('allows admin to manage companies with audit logging and headers', async () => {
+    const { accessToken } = await loginAdmin();
+
+    const listResponse = await request(app).get('/api/companies').set('Authorization', `Bearer ${accessToken}`);
+    expect(listResponse.status).toBe(200);
+    expect(listResponse.headers['cache-control']).toBe('no-store');
+    expect(listResponse.body).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'Acme Corp' }),
+      ])
+    );
+
+    const createResponse = await request(app)
+      .post('/api/companies')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ name: 'Globex Corporation' });
+    expect(createResponse.status).toBe(201);
+
+    const updateResponse = await request(app)
+      .patch(`/api/companies/${createResponse.body.id}`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ name: 'Globex Corp' });
+    expect(updateResponse.status).toBe(200);
+    expect(updateResponse.body.name).toBe('Globex Corp');
+
+    const [createdLog, updatedLog] = await Promise.all([
+      prisma.auditLog.findMany({ where: { action: 'COMPANY_CREATED' } }),
+      prisma.auditLog.findMany({ where: { action: 'COMPANY_UPDATED' } }),
+    ]);
+
+    expect(createdLog.some((entry) => entry.metadata?.companyId === createResponse.body.id)).toBe(true);
+    expect(updatedLog.some((entry) => entry.metadata?.companyId === createResponse.body.id)).toBe(true);
+  });
+
+  it('blocks non-admin users from creating companies', async () => {
+    const { accessToken: adminToken } = await loginAdmin();
+    const consultantResponse = await request(app)
+      .post('/api/users')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ email: 'consultant@example.com', password: 'Consult123!', role: 'CONSULTANT' });
+    expect(consultantResponse.status).toBe(201);
+
+    const consultantLogin = await request(app).post('/api/auth/login').send({
+      email: 'consultant@example.com',
+      password: 'Consult123!',
+    });
+    expect(consultantLogin.status).toBe(200);
+
+    const response = await request(app)
+      .post('/api/companies')
+      .set('Authorization', `Bearer ${consultantLogin.body.accessToken}`)
+      .send({ name: 'Unauthorized Inc' });
+    expect(response.status).toBe(403);
+  });
+
   it('allows project creation with role checks, wizard seeding and audit logging', async () => {
     const { accessToken, user } = await loginAdmin();
     const newMemberResponse = await request(app)
