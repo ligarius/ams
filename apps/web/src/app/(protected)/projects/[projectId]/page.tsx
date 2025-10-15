@@ -4,7 +4,10 @@ import { headers, cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
 import type { ProjectOverview } from '@backend/services/projectService';
 import type {
+  ApprovalStatus,
   ChecklistStatus,
+  DataRequestStatus,
+  FindingStatus,
   GovernanceCadence,
   GovernanceType,
   RiskLevel,
@@ -14,6 +17,9 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import RemoveIcon from '@mui/icons-material/Remove';
+import DescriptionIcon from '@mui/icons-material/Description';
+import GavelIcon from '@mui/icons-material/Gavel';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import {
   Box,
   Button,
@@ -76,6 +82,25 @@ const governanceTypeLabels: Record<GovernanceType, string> = {
   STEERING_COMMITTEE: 'Comité de dirección',
   WORKING_GROUP: 'Equipo de trabajo',
   SPONSOR_CHECKIN: 'Seguimiento con sponsor',
+};
+
+const dataRequestStatusLabels: Record<DataRequestStatus, { label: string; color: ChipProps['color'] }> = {
+  PENDING: { label: 'Pendiente', color: 'warning' },
+  IN_REVIEW: { label: 'En revisión', color: 'info' },
+  APPROVED: { label: 'Aprobada', color: 'success' },
+  REJECTED: { label: 'Rechazada', color: 'default' },
+};
+
+const findingStatusLabels: Record<FindingStatus, { label: string; color: ChipProps['color'] }> = {
+  OPEN: { label: 'Abierto', color: 'error' },
+  IN_REVIEW: { label: 'En revisión', color: 'warning' },
+  RESOLVED: { label: 'Cerrado', color: 'success' },
+};
+
+const approvalStatusLabels: Record<ApprovalStatus, { label: string; color: ChipProps['color'] }> = {
+  PENDING: { label: 'Pendiente', color: 'warning' },
+  APPROVED: { label: 'Aprobada', color: 'success' },
+  REJECTED: { label: 'Rechazada', color: 'error' },
 };
 
 const DAY_IN_MS = 1000 * 60 * 60 * 24;
@@ -231,6 +256,140 @@ export default async function ProjectOverviewPage({ params }: PageProps) {
             'Este proyecto aún no tiene una descripción registrada. Completarla ayuda a contextualizar al equipo y a los stakeholders sobre el estado de la auditoría.'}
         </Typography>
       </Stack>
+
+      <Grid container spacing={3}>
+        <Grid item xs={12} md={4}>
+          <Paper variant="outlined" sx={{ p: 3, height: '100%' }}>
+            <Stack spacing={2} height="100%">
+              <Stack direction="row" alignItems="center" spacing={1.5} justifyContent="space-between">
+                <Stack direction="row" spacing={1.5} alignItems="center">
+                  <DescriptionIcon color="primary" />
+                  <Stack spacing={0.25}>
+                    <Typography variant="subtitle2" color="text.secondary">
+                      Solicitudes de información
+                    </Typography>
+                    <Typography variant="h5">{overview.dataRequests.total}</Typography>
+                  </Stack>
+                </Stack>
+                <Chip
+                  size="small"
+                  color={overview.dataRequests.overdue > 0 ? 'error' : 'default'}
+                  variant={overview.dataRequests.overdue > 0 ? 'filled' : 'outlined'}
+                  label={
+                    overview.dataRequests.overdue > 0
+                      ? `${overview.dataRequests.overdue} atrasadas`
+                      : 'Sin atrasos'
+                  }
+                />
+              </Stack>
+              <Typography variant="body2" color="text.secondary">
+                {overview.dataRequests.nextDue
+                  ? `Próxima entrega: ${dateFormatter.format(new Date(overview.dataRequests.nextDue))}`
+                  : 'Aún no hay próximas entregas planificadas.'}
+              </Typography>
+              <Stack direction="row" spacing={1} flexWrap useFlexGap>
+                {(Object.keys(dataRequestStatusLabels) as Array<DataRequestStatus>).map((status) => {
+                  const config = dataRequestStatusLabels[status];
+                  return (
+                    <Chip
+                      key={status}
+                      size="small"
+                      color={config.color}
+                      variant="outlined"
+                      label={`${config.label}: ${overview.dataRequests.byStatus[status]}`}
+                    />
+                  );
+                })}
+              </Stack>
+            </Stack>
+          </Paper>
+        </Grid>
+
+        <Grid item xs={12} md={4}>
+          <Paper variant="outlined" sx={{ p: 3, height: '100%' }}>
+            <Stack spacing={2} height="100%">
+              <Stack direction="row" spacing={1.5} alignItems="center">
+                <WarningAmberIcon color="warning" />
+                <Stack spacing={0.25}>
+                  <Typography variant="subtitle2" color="text.secondary">
+                    Hallazgos pendientes
+                  </Typography>
+                  <Typography variant="h5">{overview.outstandingFindings.length}</Typography>
+                </Stack>
+              </Stack>
+              {overview.outstandingFindings.length === 0 ? (
+                <Typography variant="body2" color="text.secondary">
+                  No hay hallazgos abiertos. Los nuevos registros aparecerán aquí con su estado y riesgo asociado.
+                </Typography>
+              ) : (
+                <Stack spacing={1.5} divider={<Divider flexItem />}>
+                  {overview.outstandingFindings.slice(0, 3).map((finding) => {
+                    const config = findingStatusLabels[finding.status];
+                    return (
+                      <Stack key={finding.id} spacing={0.5}>
+                        <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
+                          <Typography variant="body2" fontWeight={600} sx={{ wordBreak: 'break-word' }}>
+                            {finding.title}
+                          </Typography>
+                          <Chip size="small" label={config.label} color={config.color} variant="outlined" />
+                        </Stack>
+                        <Typography variant="caption" color="text.secondary">
+                          {finding.riskTitle ? `Asociado a: ${finding.riskTitle}` : 'Riesgo no especificado'}
+                        </Typography>
+                      </Stack>
+                    );
+                  })}
+                </Stack>
+              )}
+            </Stack>
+          </Paper>
+        </Grid>
+
+        <Grid item xs={12} md={4}>
+          <Paper variant="outlined" sx={{ p: 3, height: '100%' }}>
+            <Stack spacing={2} height="100%">
+              <Stack direction="row" spacing={1.5} alignItems="center" justifyContent="space-between">
+                <Stack direction="row" spacing={1.5} alignItems="center">
+                  <GavelIcon color="action" />
+                  <Stack spacing={0.25}>
+                    <Typography variant="subtitle2" color="text.secondary">
+                      Cambios de alcance
+                    </Typography>
+                    <Typography variant="h5">{overview.approvals.pending}</Typography>
+                  </Stack>
+                </Stack>
+                <Chip size="small" variant="outlined" label="Pendientes" color="warning" />
+              </Stack>
+              {overview.approvals.recent.length === 0 ? (
+                <Typography variant="body2" color="text.secondary">
+                  Aún no se han registrado aprobaciones. Los flujos creados desde el backend aparecerán aquí.
+                </Typography>
+              ) : (
+                <Stack spacing={1.5} divider={<Divider flexItem />}>
+                  {overview.approvals.recent.slice(0, 3).map((approval) => {
+                    const config = approvalStatusLabels[approval.status];
+                    return (
+                      <Stack key={approval.id} spacing={0.5}>
+                        <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
+                          <Typography variant="body2" fontWeight={600} sx={{ wordBreak: 'break-word' }}>
+                            {approval.title}
+                          </Typography>
+                          <Chip size="small" label={config.label} color={config.color} variant="outlined" />
+                        </Stack>
+                        <Typography variant="caption" color="text.secondary">
+                          {approval.decidedAt
+                            ? `Decidido el ${dateFormatter.format(new Date(approval.decidedAt))}`
+                            : 'En espera de decisión'}
+                        </Typography>
+                      </Stack>
+                    );
+                  })}
+                </Stack>
+              )}
+            </Stack>
+          </Paper>
+        </Grid>
+      </Grid>
 
       <Paper variant="outlined" sx={{ p: 3.5 }}>
         <Stack spacing={3}>
