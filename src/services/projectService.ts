@@ -131,7 +131,7 @@ const addDays = (days: number): Date => {
   return new Date(base.getTime() + days * 24 * 60 * 60 * 1000);
 };
 
-const defaultWizardData: ResolvedWizardData = {
+const createDefaultWizardData = (): ResolvedWizardData => ({
   objectives: [
     'Comprender el marco de control y gobierno actual',
     'Evaluar riesgos críticos y madurez de procesos',
@@ -161,23 +161,42 @@ const defaultWizardData: ResolvedWizardData = {
     { name: 'Comité de dirección', role: 'Steering Committee' },
     { name: 'Equipo auditor', role: 'Working Group' },
   ],
-  frameworks: DEFAULT_AUDIT_FRAMEWORK_SELECTION,
-};
+  frameworks: [...DEFAULT_AUDIT_FRAMEWORK_SELECTION],
+});
 
 const resolveWizardData = (wizard: WizardInput | undefined): ResolvedWizardData => {
+  const defaults = createDefaultWizardData();
+
   if (!wizard) {
-    return defaultWizardData;
+    return defaults;
   }
 
-  const ensureItems = <T>(items: T[] | undefined, fallback: T[]): T[] =>
-    items && items.length > 0 ? items : fallback;
+  const objectives = wizard.objectives && wizard.objectives.length > 0 ? wizard.objectives : defaults.objectives;
+  const milestonesSource =
+    wizard.milestones && wizard.milestones.length > 0 ? wizard.milestones : defaults.milestones;
+  const risksSource = wizard.risks && wizard.risks.length > 0 ? wizard.risks : defaults.risks;
+  const stakeholdersSource =
+    wizard.stakeholders && wizard.stakeholders.length > 0 ? wizard.stakeholders : defaults.stakeholders;
+  const frameworksSource =
+    wizard.frameworks && wizard.frameworks.length > 0 ? wizard.frameworks : defaults.frameworks;
 
   return {
-    objectives: ensureItems(wizard.objectives, defaultWizardData.objectives),
-    milestones: ensureItems(wizard.milestones, defaultWizardData.milestones),
-    risks: ensureItems(wizard.risks, defaultWizardData.risks),
-    stakeholders: ensureItems(wizard.stakeholders, defaultWizardData.stakeholders),
-    frameworks: ensureItems(wizard.frameworks, defaultWizardData.frameworks),
+    objectives: [...objectives],
+    milestones: milestonesSource.map((milestone) => ({
+      name: milestone.name,
+      dueDate: new Date(milestone.dueDate),
+    })),
+    risks: risksSource.map((risk) => ({
+      title: risk.title,
+      description: risk.description,
+      likelihood: risk.likelihood,
+      impact: risk.impact,
+    })),
+    stakeholders: stakeholdersSource.map((stakeholder) => ({
+      name: stakeholder.name,
+      role: stakeholder.role,
+    })),
+    frameworks: [...frameworksSource],
   };
 };
 
@@ -414,7 +433,7 @@ export const createProject = async (payload: unknown, actor: User): Promise<Proj
 };
 
 export const getProjectWizardConfig = (): ProjectWizardConfig => {
-  const defaults = resolveWizardData(undefined);
+  const defaults = createDefaultWizardData();
 
   return {
     frameworks: AUDIT_FRAMEWORKS.map((framework) => ({
