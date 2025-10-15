@@ -67,6 +67,8 @@ export type ApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 export type TenantStatus = 'ACTIVE' | 'INACTIVE';
 export type ContractStatus = 'DRAFT' | 'ACTIVE' | 'SUSPENDED' | 'CLOSED';
 export type CurrencyCode = 'USD' | 'EUR' | 'CLP' | 'MXN' | 'COP';
+export type InitiativeType = 'QUICK_WIN' | 'POC' | 'PROJECT';
+export type InitiativeStatus = 'PLANNED' | 'IN_PROGRESS' | 'COMPLETED' | 'ON_HOLD';
 
 export interface Tenant {
   id: number;
@@ -206,6 +208,31 @@ export interface Approval {
   updatedAt: Date;
 }
 
+export interface Initiative {
+  id: number;
+  projectId: number;
+  title: string;
+  description: string | null;
+  type: InitiativeType;
+  status: InitiativeStatus;
+  resourceSummary: string;
+  startDate: Date;
+  endDate: Date;
+  estimatedBudget: number | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface InitiativeAssignment {
+  id: number;
+  initiativeId: number;
+  userId: number;
+  role: string;
+  allocationPercentage: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 interface DatabaseState {
   tenants: Tenant[];
   tenantAreas: TenantArea[];
@@ -225,6 +252,8 @@ interface DatabaseState {
   dataRequestAttachments: DataRequestAttachment[];
   findings: Finding[];
   approvals: Approval[];
+  initiatives: Initiative[];
+  initiativeAssignments: InitiativeAssignment[];
   sequences: Record<string, number>;
 }
 
@@ -247,6 +276,8 @@ const createEmptyState = (): DatabaseState => ({
   dataRequestAttachments: [],
   findings: [],
   approvals: [],
+  initiatives: [],
+  initiativeAssignments: [],
   sequences: {},
 });
 
@@ -1146,6 +1177,143 @@ class ApprovalModel {
   }
 }
 
+class InitiativeModel {
+  async findMany(params: { where: { projectId?: number } }): Promise<Initiative[]> {
+    const { projectId } = params.where;
+    return state.initiatives
+      .filter((initiative) => (projectId ? initiative.projectId === projectId : true))
+      .map((initiative) => ({ ...initiative }));
+  }
+
+  async findUnique(params: { where: { id: number } }): Promise<Initiative | null> {
+    const initiative = state.initiatives.find((item) => item.id === params.where.id);
+    return initiative ? { ...initiative } : null;
+  }
+
+  async create(params: {
+    data: {
+      projectId: number;
+      title: string;
+      description?: string | null;
+      type: InitiativeType;
+      status?: InitiativeStatus;
+      resourceSummary: string;
+      startDate: Date;
+      endDate: Date;
+      estimatedBudget?: number | null;
+    };
+  }): Promise<Initiative> {
+    const timestamp = now();
+    const initiative: Initiative = {
+      id: nextId('initiatives'),
+      projectId: params.data.projectId,
+      title: params.data.title,
+      description: params.data.description ?? null,
+      type: params.data.type,
+      status: params.data.status ?? 'PLANNED',
+      resourceSummary: params.data.resourceSummary,
+      startDate: params.data.startDate,
+      endDate: params.data.endDate,
+      estimatedBudget: params.data.estimatedBudget ?? null,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+    state.initiatives.push(initiative);
+    logOperation('initiative', 'create', { id: initiative.id, projectId: initiative.projectId, type: initiative.type });
+    return { ...initiative };
+  }
+
+  async update(params: {
+    where: { id: number };
+    data: Partial<
+      Pick<
+        Initiative,
+        'title' | 'description' | 'type' | 'status' | 'resourceSummary' | 'startDate' | 'endDate' | 'estimatedBudget'
+      >
+    >;
+  }): Promise<Initiative> {
+    const initiative = state.initiatives.find((item) => item.id === params.where.id);
+    if (!initiative) {
+      throw new Error('Initiative not found');
+    }
+    if (params.data.title !== undefined) {
+      initiative.title = params.data.title;
+    }
+    if (params.data.description !== undefined) {
+      initiative.description = params.data.description;
+    }
+    if (params.data.type !== undefined) {
+      initiative.type = params.data.type;
+    }
+    if (params.data.status !== undefined) {
+      initiative.status = params.data.status;
+    }
+    if (params.data.resourceSummary !== undefined) {
+      initiative.resourceSummary = params.data.resourceSummary;
+    }
+    if (params.data.startDate !== undefined) {
+      initiative.startDate = params.data.startDate;
+    }
+    if (params.data.endDate !== undefined) {
+      initiative.endDate = params.data.endDate;
+    }
+    if (params.data.estimatedBudget !== undefined) {
+      initiative.estimatedBudget = params.data.estimatedBudget;
+    }
+    initiative.updatedAt = now();
+    logOperation('initiative', 'update', { id: initiative.id });
+    return { ...initiative };
+  }
+
+  async delete(params: { where: { id: number } }): Promise<Initiative> {
+    const index = state.initiatives.findIndex((item) => item.id === params.where.id);
+    if (index === -1) {
+      throw new Error('Initiative not found');
+    }
+    const [removed] = state.initiatives.splice(index, 1);
+    logOperation('initiative', 'delete', { id: removed.id });
+    return { ...removed };
+  }
+}
+
+class InitiativeAssignmentModel {
+  async findMany(params: { where: { initiativeId?: number } }): Promise<InitiativeAssignment[]> {
+    const { initiativeId } = params.where;
+    return state.initiativeAssignments
+      .filter((assignment) => (initiativeId ? assignment.initiativeId === initiativeId : true))
+      .map((assignment) => ({ ...assignment }));
+  }
+
+  async create(params: {
+    data: { initiativeId: number; userId: number; role: string; allocationPercentage: number };
+  }): Promise<InitiativeAssignment> {
+    const timestamp = now();
+    const assignment: InitiativeAssignment = {
+      id: nextId('initiativeAssignments'),
+      initiativeId: params.data.initiativeId,
+      userId: params.data.userId,
+      role: params.data.role,
+      allocationPercentage: params.data.allocationPercentage,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+    state.initiativeAssignments.push(assignment);
+    logOperation('initiativeAssignment', 'create', {
+      id: assignment.id,
+      initiativeId: assignment.initiativeId,
+      userId: assignment.userId,
+    });
+    return { ...assignment };
+  }
+
+  async deleteMany(params: { where: { initiativeId: number } }): Promise<void> {
+    state.initiativeAssignments = state.initiativeAssignments.filter(
+      (assignment) => assignment.initiativeId !== params.where.initiativeId
+    );
+    logOperation('initiativeAssignment', 'deleteMany', { initiativeId: params.where.initiativeId });
+  }
+}
+
 class AuditLogModel {
   async create(params: { data: { userId: number | null; action: string; metadata?: Record<string, unknown> | null } }): Promise<AuditLog> {
     const logEntry: AuditLog = {
@@ -1223,6 +1391,8 @@ export class PrismaClient {
   dataRequestAttachment = new DataRequestAttachmentModel();
   finding = new FindingModel();
   approval = new ApprovalModel();
+  initiative = new InitiativeModel();
+  initiativeAssignment = new InitiativeAssignmentModel();
 
   async $transaction<T>(callback: (tx: PrismaClient) => Promise<T>): Promise<T> {
     return callback(this);

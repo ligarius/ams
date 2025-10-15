@@ -705,6 +705,113 @@ describe('API integration', () => {
     expect(notFoundResponse.body).toEqual({ message: 'Not found' });
   });
 
+  it('manages initiatives end-to-end with permissions and validations', async () => {
+    const { accessToken } = await loginAdmin();
+
+    const consultantResponse = await request(app)
+      .post('/api/users')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ email: 'integration.consultant@example.com', password: 'Consult123!', role: 'CONSULTANT' });
+    expect(consultantResponse.status).toBe(201);
+
+    const projectResponse = await request(app)
+      .post('/api/projects')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        companyId: 1,
+        name: 'Proyecto iniciativas API',
+        members: [{ userId: consultantResponse.body.id, role: 'CONSULTANT' }],
+      });
+    expect(projectResponse.status).toBe(201);
+    const projectId = projectResponse.body.id as number;
+
+    const createResponse = await request(app)
+      .post(`/api/projects/${projectId}/initiatives`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        title: 'Quick win automatización',
+        type: 'QUICK_WIN',
+        resourceSummary: 'Consultor experto 50%',
+        startDate: '2024-01-01',
+        endDate: '2024-01-20',
+        assignments: [{ userId: consultantResponse.body.id, role: 'Responsable', allocationPercentage: 50 }],
+      });
+    expect(createResponse.status).toBe(201);
+    const initiativeId = createResponse.body.id as number;
+
+    const invalidQuickWin = await request(app)
+      .post(`/api/projects/${projectId}/initiatives`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        title: 'Quick win inválido',
+        type: 'QUICK_WIN',
+        resourceSummary: 'Equipo extendido',
+        startDate: '2024-02-01',
+        endDate: '2024-03-15',
+      });
+    expect(invalidQuickWin.status).toBe(400);
+
+    const listResponse = await request(app)
+      .get(`/api/projects/${projectId}/initiatives`)
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(listResponse.status).toBe(200);
+    expect(Array.isArray(listResponse.body)).toBe(true);
+    expect(listResponse.body[0].assignments).toHaveLength(1);
+
+    const updateResponse = await request(app)
+      .patch(`/api/projects/${projectId}/initiatives/${initiativeId}`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        type: 'POC',
+        status: 'IN_PROGRESS',
+        endDate: '2024-03-01',
+        estimatedBudget: 25000,
+        assignments: [{ userId: consultantResponse.body.id, role: 'Responsable', allocationPercentage: 80 }],
+      });
+    expect(updateResponse.status).toBe(200);
+    expect(updateResponse.body.status).toBe('IN_PROGRESS');
+    expect(updateResponse.body.assignments[0].allocationPercentage).toBe(80);
+
+    const clientResponse = await request(app)
+      .post('/api/users')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ email: 'integration.client@example.com', password: 'Client123!', role: 'CLIENT' });
+    expect(clientResponse.status).toBe(201);
+
+    const clientLogin = await request(app).post('/api/auth/login').send({
+      email: 'integration.client@example.com',
+      password: 'Client123!',
+    });
+    expect(clientLogin.status).toBe(200);
+
+    await prisma.membership.create({ data: { projectId, userId: clientResponse.body.id, role: 'CLIENT' } });
+
+    const forbiddenResponse = await request(app)
+      .post(`/api/projects/${projectId}/initiatives`)
+      .set('Authorization', `Bearer ${clientLogin.body.accessToken}`)
+      .send({
+        title: 'Intento no autorizado',
+        type: 'POC',
+        resourceSummary: 'Equipo interno',
+        startDate: '2024-01-05',
+        endDate: '2024-02-15',
+        estimatedBudget: 12000,
+        assignments: [{ userId: clientResponse.body.id, role: 'Cliente', allocationPercentage: 10 }],
+      });
+    expect(forbiddenResponse.status).toBe(403);
+
+    const deleteResponse = await request(app)
+      .delete(`/api/projects/${projectId}/initiatives/${initiativeId}`)
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(deleteResponse.status).toBe(204);
+
+    const finalList = await request(app)
+      .get(`/api/projects/${projectId}/initiatives`)
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(finalList.status).toBe(200);
+    expect(finalList.body).toHaveLength(0);
+  });
+
   it('guards data request routes against malformed identifiers and payloads', async () => {
     const { accessToken } = await loginAdmin();
 
