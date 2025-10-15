@@ -49,8 +49,11 @@ Diseñar y entregar una interfaz web robusta que consuma el backend existente de
 | --- | --- | --- | --- |
 | **F1** ✅ | Autenticación y layout base | Login, registro de sesión, layout protegido, navegación principal | Lint, unit tests auth, e2e login |
 | **F2** ✅ | Wizard de proyectos | Pasos del wizard, validaciones Zod compartidas, integración con `POST /projects` | Tests de formularios, e2e creación proyecto |
-| **F3** | Overview y dashboards | Página `/projects/:id`, componentes de KPIs, estado global | Testing Library + Playwright overview |
-| **F4** | Solicitudes de información | CRUD UI, subida de archivos, cola de reintentos | Tests de subida (MSW), e2e data request |
+| **F3** ✅ | Overview y dashboards | Página `/projects/:id`, componentes de KPIs, estado global | Testing Library + Playwright overview |
+| **F4** 🚧 | Solicitudes de información | CRUD UI, subida de archivos, cola de reintentos | Tests de subida (MSW), e2e data request |
+
+Con el entregable de overview publicado en el sprint F3, los esfuerzos se enfocan ahora en levantar el backlog detallado para F4
+y preparar las integraciones de solicitudes de información (subidas, reintentos y guardado offline) antes de abrir desarrollo.
 | **F5** | Riesgos y hallazgos | Vistas con tablas/kanban, linking cruzado, filtros avanzados | Visual regression, e2e riesgo→hallazgo |
 | **F6** | Aprobaciones y notificaciones | Flujos de scope change, historial, toasts en vivo | E2E aprobaciones, pruebas de permisos |
 | **F7** | Observabilidad y hardening | Monitoreo UX, optimización performance, auditorías seguridad | Core Web Vitals en CI, escaneo OWASP |
