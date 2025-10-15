@@ -7,7 +7,10 @@ import {
   type AuditFrameworkId,
 } from '@/config/auditFrameworks';
 import prisma, {
+  ApprovalStatus,
   ChecklistStatus,
+  DataRequestStatus,
+  FindingStatus,
   GovernanceCadence,
   GovernanceType,
   PrismaClient,
@@ -18,6 +21,9 @@ import prisma, {
 } from '@/lib/prisma';
 
 const RISK_LEVELS: RiskLevel[] = ['LOW', 'MEDIUM', 'HIGH'];
+const DATA_REQUEST_STATUSES: DataRequestStatus[] = ['PENDING', 'IN_REVIEW', 'APPROVED', 'REJECTED'];
+const APPROVAL_STATUSES: ApprovalStatus[] = ['PENDING', 'APPROVED', 'REJECTED'];
+const ACTIVE_FINDING_STATUSES: FindingStatus[] = ['OPEN', 'IN_REVIEW'];
 
 const isoDateSchema = z
   .string()
@@ -369,6 +375,34 @@ export interface ProjectOverview {
     owner: string;
     nextMeetingAt: string | null;
   }>;
+  dataRequests: {
+    total: number;
+    overdue: number;
+    nextDue: string | null;
+    byStatus: Record<DataRequestStatus, number>;
+    upcoming: Array<{
+      id: number;
+      title: string;
+      dueDate: string | null;
+      status: DataRequestStatus;
+    }>;
+  };
+  outstandingFindings: Array<{
+    id: number;
+    title: string;
+    status: FindingStatus;
+    riskId: number;
+    riskTitle: string | null;
+  }>;
+  approvals: {
+    pending: number;
+    recent: Array<{
+      id: number;
+      title: string;
+      status: ApprovalStatus;
+      decidedAt: string | null;
+    }>;
+  };
 }
 
 export const listProjects = async (user: User): Promise<Project[]> => {
@@ -480,11 +514,14 @@ export const getProjectOverview = async (projectId: number, actor: User): Promis
 
   await ensureProjectAccess(projectId, actor);
 
-  const [kpis, checklists, risks, governance] = await Promise.all([
+  const [kpis, checklists, risks, governance, dataRequests, approvals, findings] = await Promise.all([
     prisma.projectKpi.findMany({ where: { projectId } }),
     prisma.projectChecklist.findMany({ where: { projectId } }),
     prisma.projectRisk.findMany({ where: { projectId } }),
     prisma.governanceEvent.findMany({ where: { projectId } }),
+    prisma.dataRequest.findMany({ where: { projectId } }),
+    prisma.approval.findMany({ where: { projectId } }),
+    prisma.finding.findMany({ where: { projectId } }),
   ]);
 
   const formattedKpis = kpis.map((kpi) => ({
@@ -547,6 +584,52 @@ export const getProjectOverview = async (projectId: number, actor: User): Promis
       nextMeetingAt: event.nextMeetingAt ? event.nextMeetingAt.toISOString() : null,
     }));
 
+  const byStatus = DATA_REQUEST_STATUSES.reduce<Record<DataRequestStatus, number>>((acc, status) => {
+    acc[status] = dataRequests.filter((request) => request.status === status).length;
+    return acc;
+  }, {} as Record<DataRequestStatus, number>);
+
+  const actionableRequests = dataRequests.filter((request) => request.status === 'PENDING' || request.status === 'IN_REVIEW');
+  const now = Date.now();
+  const upcoming = actionableRequests
+    .filter((request) => request.dueDate)
+    .sort((a, b) => a.dueDate!.getTime() - b.dueDate!.getTime())
+    .slice(0, 3)
+    .map((request) => ({
+      id: request.id,
+      title: request.title,
+      dueDate: request.dueDate ? request.dueDate.toISOString() : null,
+      status: request.status,
+    }));
+
+  const overdue = actionableRequests.filter((request) => request.dueDate && request.dueDate.getTime() < now).length;
+  const nextDue = upcoming.length > 0 ? upcoming[0].dueDate : null;
+
+  const riskLookup = new Map(risks.map((risk) => [risk.id, risk.title] as const));
+  const outstandingFindings = findings
+    .filter((finding) => ACTIVE_FINDING_STATUSES.includes(finding.status))
+    .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
+    .slice(0, 5)
+    .map((finding) => ({
+      id: finding.id,
+      title: finding.title,
+      status: finding.status,
+      riskId: finding.riskId,
+      riskTitle: riskLookup.get(finding.riskId) ?? null,
+    }));
+
+  const pendingApprovals = approvals.filter((approval) => approval.status === 'PENDING').length;
+  const recentApprovals = approvals
+    .slice()
+    .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
+    .slice(0, 5)
+    .map((approval) => ({
+      id: approval.id,
+      title: approval.title,
+      status: approval.status,
+      decidedAt: approval.decidedAt ? approval.decidedAt.toISOString() : null,
+    }));
+
   return {
     project: {
       id: project.id,
@@ -557,5 +640,17 @@ export const getProjectOverview = async (projectId: number, actor: User): Promis
     pendingChecklists,
     topRisks,
     governance: governanceOverview,
+    dataRequests: {
+      total: dataRequests.length,
+      overdue,
+      nextDue,
+      byStatus,
+      upcoming,
+    },
+    outstandingFindings,
+    approvals: {
+      pending: pendingApprovals,
+      recent: recentApprovals,
+    },
   };
 };

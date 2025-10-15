@@ -36,6 +36,8 @@ describe('apps/web project overview API route', () => {
     expect(result.body.project.id).toBe(project.id);
     expect(result.body.project.name).toBe('Next Overview Project');
     expect(Array.isArray(result.body.kpis)).toBe(true);
+    expect(result.body.dataRequests.total).toBe(0);
+    expect(result.body.approvals.pending).toBe(0);
   });
 
   it('returns 404 when the project does not exist', async () => {

@@ -261,6 +261,15 @@ describe('API integration', () => {
     expect(overviewResponse.body.pendingChecklists[0].name).toBe('Inicio');
     expect(overviewResponse.body.topRisks[0].title).toBe('Disponibilidad de recursos');
     expect(overviewResponse.body.governance[0].owner).toBe('Laura Sponsor');
+    expect(overviewResponse.body.dataRequests.total).toBe(0);
+    expect(overviewResponse.body.dataRequests.byStatus).toMatchObject({
+      PENDING: 0,
+      IN_REVIEW: 0,
+      APPROVED: 0,
+      REJECTED: 0,
+    });
+    expect(Array.isArray(overviewResponse.body.outstandingFindings)).toBe(true);
+    expect(overviewResponse.body.approvals.pending).toBe(0);
   });
 
   it('applies default wizard data when payload is partial or missing', async () => {
@@ -291,6 +300,8 @@ describe('API integration', () => {
     expect(firstChecklistDue.getTime()).toBeGreaterThan(Date.now());
     expect(partialOverview.body.topRisks).toHaveLength(2);
     expect(partialOverview.body.governance[0].owner).toBe('María González');
+    expect(partialOverview.body.dataRequests.total).toBe(0);
+    expect(partialOverview.body.approvals.pending).toBe(0);
 
     const defaultWizardResponse = await request(app)
       .post('/api/projects')
@@ -321,6 +332,12 @@ describe('API integration', () => {
     expect(defaultOverview.status).toBe(200);
     expect(defaultOverview.body.kpis).toHaveLength(3);
     expect(defaultOverview.body.pendingChecklists.length).toBeGreaterThanOrEqual(3);
+    expect(defaultOverview.body.dataRequests.byStatus).toMatchObject({
+      PENDING: expect.any(Number),
+      IN_REVIEW: expect.any(Number),
+      APPROVED: expect.any(Number),
+      REJECTED: expect.any(Number),
+    });
   });
 
   it('returns 403 when client attempts to create a project', async () => {
