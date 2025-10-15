@@ -186,7 +186,7 @@ interface DatabaseState {
   sequences: Record<string, number>;
 }
 
-const state: DatabaseState = {
+const createEmptyState = (): DatabaseState => ({
   users: [],
   companies: [],
   projects: [],
@@ -203,7 +203,21 @@ const state: DatabaseState = {
   findings: [],
   approvals: [],
   sequences: {},
+});
+
+type GlobalPrismaState = typeof globalThis & {
+  __PRISMA_STATE__?: DatabaseState;
 };
+
+const getGlobalState = (): DatabaseState => {
+  const globalForPrisma = globalThis as GlobalPrismaState;
+  if (!globalForPrisma.__PRISMA_STATE__) {
+    globalForPrisma.__PRISMA_STATE__ = createEmptyState();
+  }
+  return globalForPrisma.__PRISMA_STATE__;
+};
+
+let state: DatabaseState = getGlobalState();
 
 const nextId = (model: keyof DatabaseState['sequences']) => {
   const current = state.sequences[model] ?? 0;
@@ -247,26 +261,15 @@ const seed = () => {
 };
 
 const resetState = () => {
-  state.users = [];
-  state.companies = [];
-  state.projects = [];
-  state.memberships = [];
-  state.auditLogs = [];
-  state.refreshTokens = [];
-  state.projectCategories = [];
-  state.projectRisks = [];
-  state.projectChecklists = [];
-  state.projectKpis = [];
-  state.governanceEvents = [];
-  state.dataRequests = [];
-  state.dataRequestAttachments = [];
-  state.findings = [];
-  state.approvals = [];
-  state.sequences = {};
+  const globalForPrisma = globalThis as GlobalPrismaState;
+  state = createEmptyState();
+  globalForPrisma.__PRISMA_STATE__ = state;
   seed();
 };
 
-resetState();
+if (state.users.length === 0 && Object.keys(state.sequences).length === 0) {
+  seed();
+}
 
 const logOperation = (model: string, action: string, payload: unknown) => {
   logger.debug({ model, action, payload }, 'db operation');
