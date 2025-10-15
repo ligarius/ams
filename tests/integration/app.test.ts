@@ -146,7 +146,15 @@ describe('API integration', () => {
       expect.objectContaining({ id: expect.any(String), checklist: expect.any(Array) })
     );
     expect(response.body.defaults.objectives.length).toBeGreaterThan(0);
-    expect(response.body.defaults.milestones.every((item: { dueDate: string }) => typeof item.dueDate === 'string')).toBe(true);
+    expect(
+      response.body.defaults.milestones.every((item: { dueDate: string }) => typeof item.dueDate === 'string')
+    ).toBe(true);
+    const now = Date.now();
+    response.body.defaults.milestones.forEach((milestone: { dueDate: string }) => {
+      const dueTime = new Date(milestone.dueDate).getTime();
+      expect(Number.isNaN(dueTime)).toBe(false);
+      expect(dueTime).toBeGreaterThan(now);
+    });
     expect(response.body.riskLevels).toEqual(expect.arrayContaining(['LOW', 'MEDIUM', 'HIGH']));
   });
 
@@ -278,6 +286,9 @@ describe('API integration', () => {
     expect(partialOverview.status).toBe(200);
     expect(partialOverview.body.pendingChecklists.length).toBeGreaterThanOrEqual(3);
     expect(partialOverview.body.pendingChecklists[0].name).toBe('Kickoff con stakeholders');
+    const firstChecklistDue = new Date(partialOverview.body.pendingChecklists[0].dueDate);
+    expect(Number.isNaN(firstChecklistDue.getTime())).toBe(false);
+    expect(firstChecklistDue.getTime()).toBeGreaterThan(Date.now());
     expect(partialOverview.body.topRisks).toHaveLength(2);
     expect(partialOverview.body.governance[0].owner).toBe('María González');
 
