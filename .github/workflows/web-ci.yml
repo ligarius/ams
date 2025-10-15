@@ -1,0 +1,52 @@
+name: web CI
+
+on:
+  pull_request:
+    paths:
+      - 'apps/web/**'
+  push:
+    branches: [ main ]
+    paths:
+      - 'apps/web/**'
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: 'npm'
+
+      - name: Install deps (apps/web)
+        working-directory: apps/web
+        run: npm ci
+
+      - name: Lint
+        working-directory: apps/web
+        run: npm run lint
+
+      - name: Typecheck
+        working-directory: apps/web
+        run: npm run typecheck
+
+      - name: Unit tests
+        if: ${{ hashFiles('apps/web/vitest.config.ts') != '' }}
+        working-directory: apps/web
+        run: npm run test
+
+      - name: Coverage
+        if: ${{ hashFiles('apps/web/vitest.config.ts') != '' }}
+        working-directory: apps/web
+        run: npm run coverage
+
+      - name: E2E tests
+        if: ${{ hashFiles('apps/web/playwright.config.ts') != '' }}
+        working-directory: apps/web
+        run: |
+          npx playwright install --with-deps
+          npm run test:e2e
