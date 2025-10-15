@@ -118,6 +118,8 @@ export interface ProjectRisk {
   description: string | null;
   severity: RiskLevel;
   likelihood: RiskLevel;
+  urgency: RiskLevel;
+  complexity: RiskLevel;
   status: RiskStatus;
   process: string | null;
   system: string | null;
@@ -750,6 +752,8 @@ class ProjectRiskModel {
       description?: string | null;
       severity: RiskLevel;
       likelihood: RiskLevel;
+      urgency: RiskLevel;
+      complexity: RiskLevel;
       status?: RiskStatus;
       process?: string | null;
       system?: string | null;
@@ -764,6 +768,8 @@ class ProjectRiskModel {
       description: params.data.description ?? null,
       severity: params.data.severity,
       likelihood: params.data.likelihood,
+      urgency: params.data.urgency,
+      complexity: params.data.complexity,
       status: params.data.status ?? 'OPEN',
       process: params.data.process ?? null,
       system: params.data.system ?? null,
@@ -782,7 +788,12 @@ class ProjectRiskModel {
 
   async update(params: {
     where: { id: number };
-    data: Partial<Pick<ProjectRisk, 'title' | 'description' | 'severity' | 'likelihood' | 'status' | 'process' | 'system' | 'dataRequestId'>>;
+    data: Partial<
+      Pick<
+        ProjectRisk,
+        'title' | 'description' | 'severity' | 'likelihood' | 'urgency' | 'complexity' | 'status' | 'process' | 'system' | 'dataRequestId'
+      >
+    >;
   }): Promise<ProjectRisk> {
     const risk = state.projectRisks.find((item) => item.id === params.where.id);
     if (!risk) {
@@ -799,6 +810,12 @@ class ProjectRiskModel {
     }
     if (params.data.likelihood !== undefined) {
       risk.likelihood = params.data.likelihood;
+    }
+    if (params.data.urgency !== undefined) {
+      risk.urgency = params.data.urgency;
+    }
+    if (params.data.complexity !== undefined) {
+      risk.complexity = params.data.complexity;
     }
     if (params.data.status !== undefined) {
       risk.status = params.data.status;

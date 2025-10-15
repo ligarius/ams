@@ -59,6 +59,28 @@ const likelihoodConfig: Record<RiskLevel, { label: string; color: ChipProps['col
   HIGH: { label: 'Probabilidad alta', color: 'error' },
 };
 
+const urgencyConfig: Record<RiskLevel, { label: string; color: ChipProps['color'] }> = {
+  LOW: { label: 'Urgencia baja', color: 'success' },
+  MEDIUM: { label: 'Urgencia media', color: 'warning' },
+  HIGH: { label: 'Urgencia alta', color: 'error' },
+};
+
+const complexityConfig: Record<RiskLevel, { label: string; color: ChipProps['color'] }> = {
+  LOW: { label: 'Complejidad baja', color: 'success' },
+  MEDIUM: { label: 'Complejidad media', color: 'warning' },
+  HIGH: { label: 'Complejidad alta', color: 'error' },
+};
+
+const riskLevelLabel: Record<RiskLevel, string> = {
+  HIGH: 'Alta',
+  MEDIUM: 'Media',
+  LOW: 'Baja',
+};
+
+const scoreFormatter = new Intl.NumberFormat('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+
+const prioritizationLevels: RiskLevel[] = ['HIGH', 'MEDIUM', 'LOW'];
+
 const riskStatusConfig: Record<RiskStatus, { label: string; color: ChipProps['color'] }> = {
   OPEN: { label: 'Abierto', color: 'error' },
   IN_PROGRESS: { label: 'En progreso', color: 'warning' },
@@ -233,6 +255,8 @@ export default async function ProjectOverviewPage({ params }: PageProps) {
   const overview = (await response.json()) as ProjectOverview;
 
   const achievedKpis = overview.kpis.filter((kpi) => kpi.target > 0 && kpi.current >= kpi.target).length;
+  const prioritizedRisks = overview.prioritization.ordered;
+  const topPrioritized = prioritizedRisks.slice(0, 3);
 
   return (
     <Stack spacing={6}>
@@ -513,39 +537,159 @@ export default async function ProjectOverviewPage({ params }: PageProps) {
           <Paper variant="outlined" sx={{ p: 3.5, height: '100%' }}>
             <Stack spacing={3} height="100%">
               <Typography variant="h6">Riesgos prioritarios</Typography>
-              {overview.topRisks.length === 0 ? (
+              {prioritizedRisks.length === 0 ? (
                 <Typography variant="body2" color="text.secondary">
-                  Los riesgos registrados se mostrarán aquí priorizados por severidad y probabilidad. Usa este bloque para darle
-                  seguimiento a las mitigaciones clave.
+                  Los riesgos registrados se mostrarán aquí priorizados por impacto, urgencia y complejidad. A medida que se
+                  agreguen nuevos riesgos, verás los más críticos junto a su puntaje combinado.
                 </Typography>
               ) : (
                 <Stack spacing={2.5} divider={<Divider flexItem />}>
-                  {overview.topRisks.map((risk) => {
-                    const severity = severityConfig[risk.severity];
-                    const likelihood = likelihoodConfig[risk.likelihood];
+                  {topPrioritized.map((risk) => {
                     const status = riskStatusConfig[risk.status];
+                    const severity = severityConfig[risk.severity];
+                    const urgency = urgencyConfig[risk.urgency];
+                    const complexity = complexityConfig[risk.complexity];
+                    const likelihood = likelihoodConfig[risk.likelihood];
                     return (
                       <Stack key={risk.id} spacing={1.5}>
                         <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={1}>
                           <Typography variant="subtitle1" fontWeight={600} sx={{ wordBreak: 'break-word' }}>
                             {risk.title}
                           </Typography>
-                          <Chip size="small" color={status.color} label={status.label} />
+                          <Stack direction="row" spacing={0.5} alignItems="center">
+                            <Chip size="small" color="primary" label={`Puntaje ${scoreFormatter.format(risk.score)}`} />
+                            <Chip size="small" color={status.color} label={status.label} />
+                          </Stack>
                         </Stack>
-                        {risk.description && (
-                          <Typography variant="body2" color="text.secondary">
-                            {risk.description}
-                          </Typography>
-                        )}
                         <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
                           <Chip size="small" variant="outlined" color={severity.color} label={severity.label} />
                           <Chip size="small" variant="outlined" color={likelihood.color} label={likelihood.label} />
+                          <Chip size="small" variant="outlined" color={urgency.color} label={urgency.label} />
+                          <Chip size="small" variant="outlined" color={complexity.color} label={complexity.label} />
                         </Stack>
                       </Stack>
                     );
                   })}
                 </Stack>
               )}
+
+              <Stack spacing={1.5}>
+                <Typography variant="subtitle2" color="text.secondary">
+                  Matriz impacto vs. urgencia
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  La puntuación pondera el impacto y la urgencia, favoreciendo riesgos con menor complejidad para priorizar
+                  remediaciones rápidas.
+                </Typography>
+                <Box sx={{ overflowX: 'auto' }}>
+                  <Box
+                    sx={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(4, minmax(140px, 1fr))',
+                      gap: 1,
+                      minWidth: 560,
+                    }}
+                  >
+                    <Box sx={{ p: 1 }} />
+                    {prioritizationLevels.map((urgency) => (
+                      <Box
+                        key={`urgency-header-${urgency}`}
+                        sx={{
+                          p: 1,
+                          borderRadius: 1,
+                          bgcolor: 'background.default',
+                          border: '1px solid',
+                          borderColor: 'divider',
+                        }}
+                      >
+                        <Typography variant="caption" color="text.secondary">
+                          Urgencia
+                        </Typography>
+                        <Typography variant="subtitle2">{riskLevelLabel[urgency]}</Typography>
+                      </Box>
+                    ))}
+                    {prioritizationLevels.map((impact) => (
+                      <Fragment key={`impact-row-${impact}`}>
+                        <Box
+                          sx={{
+                            p: 1,
+                            borderRadius: 1,
+                            bgcolor: 'background.default',
+                            border: '1px solid',
+                            borderColor: 'divider',
+                          }}
+                        >
+                          <Typography variant="caption" color="text.secondary">
+                            Impacto
+                          </Typography>
+                          <Typography variant="subtitle2">{riskLevelLabel[impact]}</Typography>
+                        </Box>
+                        {prioritizationLevels.map((urgency) => {
+                          const items = overview.prioritization.matrix[impact][urgency];
+                          return (
+                            <Box
+                              key={`${impact}-${urgency}`}
+                              sx={{
+                                border: '1px solid',
+                                borderColor: 'divider',
+                                borderRadius: 1,
+                                p: 1.5,
+                                minHeight: 112,
+                                bgcolor: 'background.paper',
+                              }}
+                            >
+                              {items.length === 0 ? (
+                                <Typography variant="caption" color="text.secondary">
+                                  Sin registros
+                                </Typography>
+                              ) : (
+                                <Stack spacing={1.25}>
+                                  {items.map((item) => {
+                                    const complexity = complexityConfig[item.complexity];
+                                    const status = riskStatusConfig[item.status];
+                                    return (
+                                      <Stack key={item.id} spacing={0.75}>
+                                        <Stack direction="row" justifyContent="space-between" spacing={1}>
+                                          <Typography
+                                            variant="body2"
+                                            fontWeight={600}
+                                            sx={{ wordBreak: 'break-word' }}
+                                          >
+                                            {item.title}
+                                          </Typography>
+                                          <Chip
+                                            size="small"
+                                            color="primary"
+                                            label={`Puntaje ${scoreFormatter.format(item.score)}`}
+                                          />
+                                        </Stack>
+                                        <Stack direction="row" spacing={0.5} flexWrap useFlexGap>
+                                          <Chip
+                                            size="small"
+                                            variant="outlined"
+                                            color={complexity.color}
+                                            label={complexity.label}
+                                          />
+                                          <Chip
+                                            size="small"
+                                            variant="outlined"
+                                            color={status.color}
+                                            label={status.label}
+                                          />
+                                        </Stack>
+                                      </Stack>
+                                    );
+                                  })}
+                                </Stack>
+                              )}
+                            </Box>
+                          );
+                        })}
+                      </Fragment>
+                    ))}
+                  </Box>
+                </Box>
+              </Stack>
             </Stack>
           </Paper>
         </Grid>

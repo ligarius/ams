@@ -270,6 +270,8 @@ describe('API integration', () => {
     });
     expect(Array.isArray(overviewResponse.body.outstandingFindings)).toBe(true);
     expect(overviewResponse.body.approvals.pending).toBe(0);
+    expect(Array.isArray(overviewResponse.body.prioritization.ordered)).toBe(true);
+    expect(overviewResponse.body.prioritization.matrix.HIGH.MEDIUM).toBeDefined();
   });
 
   it('applies default wizard data when payload is partial or missing', async () => {
@@ -437,6 +439,58 @@ describe('API integration', () => {
     expect(outsiderResponse.status).toBe(403);
   });
 
+  it('returns overview with matriz de priorización y puntajes combinados', async () => {
+    const { accessToken } = await loginAdmin();
+
+    const projectResponse = await request(app)
+      .post('/api/projects')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ companyId: 1, name: 'Proyecto de priorización', description: 'Escenario de pruebas', wizard: {} });
+    expect(projectResponse.status).toBe(201);
+
+    const projectId = projectResponse.body.id;
+
+    const createHighPriority = await request(app)
+      .post(`/api/projects/${projectId}/risks`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        title: 'Acceso privilegiado sin control',
+        likelihood: 'HIGH',
+        severity: 'HIGH',
+        urgency: 'HIGH',
+        complexity: 'LOW',
+      });
+    expect(createHighPriority.status).toBe(201);
+
+    const createComplexRisk = await request(app)
+      .post(`/api/projects/${projectId}/risks`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        title: 'Remediación con múltiples dependencias',
+        likelihood: 'MEDIUM',
+        severity: 'HIGH',
+        urgency: 'HIGH',
+        complexity: 'HIGH',
+      });
+    expect(createComplexRisk.status).toBe(201);
+
+    const overviewResponse = await request(app)
+      .get(`/api/projects/${projectId}/overview`)
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(overviewResponse.status).toBe(200);
+
+    expect(overviewResponse.body.prioritization).toBeDefined();
+    expect(Array.isArray(overviewResponse.body.prioritization.ordered)).toBe(true);
+    expect(overviewResponse.body.prioritization.ordered.length).toBeGreaterThan(0);
+    expect(overviewResponse.body.prioritization.ordered[0].title).toBe('Acceso privilegiado sin control');
+    expect(overviewResponse.body.prioritization.matrix.HIGH.HIGH[0].title).toBe('Acceso privilegiado sin control');
+    expect(
+      overviewResponse.body.prioritization.matrix.HIGH.HIGH.some(
+        (item: { title: string }) => item.title === 'Remediación con múltiples dependencias'
+      )
+    ).toBe(true);
+  });
+
   it('fails project creation when members include an unknown user', async () => {
     const { accessToken } = await loginAdmin();
 
@@ -567,6 +621,8 @@ describe('API integration', () => {
         description: 'Riesgo por retrasos en cargas',
         likelihood: 'MEDIUM',
         severity: 'HIGH',
+        urgency: 'HIGH',
+        complexity: 'MEDIUM',
         dataRequestId,
       });
     expect(riskResponse.status).toBe(201);
