@@ -1,12 +1,8 @@
 import { Fragment, type ReactElement } from 'react';
 import NextLink from 'next/link';
+import { headers, cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
-import { fetchServerSession } from '@/lib/auth/server-session';
-import prisma from '@backend/lib/prisma';
-import {
-  getProjectOverview,
-  type ProjectOverview,
-} from '@backend/services/projectService';
+import type { ProjectOverview } from '@backend/services/projectService';
 import type {
   ChecklistStatus,
   GovernanceCadence,
@@ -83,6 +79,29 @@ const governanceTypeLabels: Record<GovernanceType, string> = {
 };
 
 const DAY_IN_MS = 1000 * 60 * 60 * 24;
+
+const getBaseUrl = () => {
+  const headerList = headers();
+  const host = headerList.get('x-forwarded-host') ?? headerList.get('host');
+  if (host) {
+    const protocol = headerList.get('x-forwarded-proto') ?? 'http';
+    return `${protocol}://${host}`;
+  }
+  const fallback = process.env.NEXT_PUBLIC_APP_URL ?? process.env.APP_URL;
+  if (!fallback) {
+    throw new Error('Unable to determine host for project overview fetch');
+  }
+  return fallback.replace(/\/$/, '');
+};
+
+const buildCookieHeader = () => {
+  const cookieStore = cookies();
+  const entries = cookieStore.getAll();
+  if (entries.length === 0) {
+    return undefined;
+  }
+  return entries.map(({ name, value }) => `${name}=${value}`).join('; ');
+};
 
 function formatRelativeDays(date: Date): number {
   const target = new Date(date.getFullYear(), date.getMonth(), date.getDate());
@@ -167,28 +186,26 @@ export default async function ProjectOverviewPage({ params }: PageProps) {
     notFound();
   }
 
-  const session = await fetchServerSession();
-  if (!session) {
+  const baseUrl = getBaseUrl();
+  const cookieHeader = buildCookieHeader();
+  const response = await fetch(`${baseUrl}/api/projects/${projectId}/overview`, {
+    method: 'GET',
+    cache: 'no-store',
+    headers: {
+      Accept: 'application/json',
+      ...(cookieHeader ? { cookie: cookieHeader } : {}),
+    },
+  });
+
+  if (response.status === 401 || response.status === 403 || response.status === 404) {
     notFound();
   }
 
-  const actor = await prisma.user.findUnique({ where: { id: session.user.id } });
-  if (!actor) {
-    notFound();
+  if (!response.ok) {
+    throw new Error(`Failed to fetch project overview: ${response.status}`);
   }
 
-  let overview: ProjectOverview;
-  try {
-    overview = await getProjectOverview(projectId, actor);
-  } catch (error) {
-    if (
-      error instanceof Error &&
-      (error.message === 'Project not found' || error.message === 'Insufficient permissions')
-    ) {
-      notFound();
-    }
-    throw error;
-  }
+  const overview = (await response.json()) as ProjectOverview;
 
   const achievedKpis = overview.kpis.filter((kpi) => kpi.target > 0 && kpi.current >= kpi.target).length;
 

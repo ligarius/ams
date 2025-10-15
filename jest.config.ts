@@ -9,8 +9,12 @@ const config: Config = {
   coverageReporters: ['text', 'lcov'],
   moduleFileExtensions: ['ts', 'js', 'json'],
   moduleNameMapper: {
+    '^@backend/(.*)$': '<rootDir>/src/$1',
+    '^@/lib/auth/(.*)$': '<rootDir>/apps/web/src/lib/auth/$1',
     '^@/(.*)$': '<rootDir>/src/$1',
     '^next/headers$': '<rootDir>/tests/mocks/next-headers',
+    '^next/server$': '<rootDir>/tests/mocks/next-server',
+    '^react$': '<rootDir>/tests/mocks/react',
   },
   testPathIgnorePatterns: ['<rootDir>/tests/e2e'],
 };
