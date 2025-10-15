@@ -132,6 +132,46 @@ describe('API integration', () => {
     expect(response.status).toBe(403);
   });
 
+  it('exposes wizard configuration with defaults for project creation', async () => {
+    const { accessToken } = await loginAdmin();
+
+    const response = await request(app)
+      .get('/api/projects/wizard/config')
+      .set('Authorization', `Bearer ${accessToken}`);
+
+    expect(response.status).toBe(200);
+    expect(Array.isArray(response.body.frameworks)).toBe(true);
+    expect(response.body.frameworks.length).toBeGreaterThan(0);
+    expect(response.body.frameworks[0]).toEqual(
+      expect.objectContaining({ id: expect.any(String), checklist: expect.any(Array) })
+    );
+    expect(response.body.defaults.objectives.length).toBeGreaterThan(0);
+    expect(response.body.defaults.milestones.every((item: { dueDate: string }) => typeof item.dueDate === 'string')).toBe(true);
+    expect(response.body.riskLevels).toEqual(expect.arrayContaining(['LOW', 'MEDIUM', 'HIGH']));
+  });
+
+  it('prevents clients from accessing wizard configuration', async () => {
+    const { accessToken: adminToken } = await loginAdmin();
+
+    const clientCreation = await request(app)
+      .post('/api/users')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ email: 'client@example.com', password: 'Client123!', role: 'CLIENT' });
+    expect(clientCreation.status).toBe(201);
+
+    const clientLogin = await request(app).post('/api/auth/login').send({
+      email: 'client@example.com',
+      password: 'Client123!',
+    });
+    expect(clientLogin.status).toBe(200);
+
+    const response = await request(app)
+      .get('/api/projects/wizard/config')
+      .set('Authorization', `Bearer ${clientLogin.body.accessToken}`);
+
+    expect(response.status).toBe(403);
+  });
+
   it('allows project creation with role checks, wizard seeding and audit logging', async () => {
     const { accessToken, user } = await loginAdmin();
     const newMemberResponse = await request(app)
