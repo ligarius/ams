@@ -152,7 +152,7 @@ export const transitionApproval = async (
     try {
       const envelope = await signatureProvider.getEnvelopeStatus(approval.signatureEnvelopeId);
       signaturePatch = mapEnvelopeToApprovalPatch(envelope, approval);
-    } catch (error) {
+    } catch {
       throw new Error('Unable to refresh signature status');
     }
   }
