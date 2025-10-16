@@ -1,7 +1,20 @@
 import request from 'supertest';
 import { createApp } from '@/server';
-import prisma, { resetDatabase } from '@/lib/prisma';
+import prisma, { resetDatabase, type SignatureStatus } from '@/lib/prisma';
 import { signAccessToken } from '@/utils/token';
+import signatureProvider from '@/services/signatureProvider';
+
+jest.mock('@/services/signatureProvider', () => ({
+  __esModule: true,
+  default: {
+    createEnvelope: jest.fn(),
+    getEnvelopeStatus: jest.fn(),
+    validateWebhook: jest.fn(),
+    parseWebhookEvent: jest.fn(),
+  },
+}));
+
+const mockSignatureProvider = signatureProvider as jest.Mocked<typeof signatureProvider>;
 
 const app = createApp();
 
@@ -15,7 +28,33 @@ const loginAdmin = async () => {
 
 describe('API integration', () => {
   beforeEach(() => {
+    jest.resetAllMocks();
     resetDatabase();
+    const baseEnvelope = {
+      envelopeId: 'env-123',
+      documentId: 'doc-123',
+      signingUrl: 'https://sign.example.com/envelope/env-123',
+      status: 'SENT' as SignatureStatus,
+      sentAt: new Date('2024-01-01T12:00:00Z'),
+      completedAt: null,
+      declinedAt: null,
+    };
+    mockSignatureProvider.createEnvelope.mockResolvedValue(baseEnvelope);
+    mockSignatureProvider.getEnvelopeStatus.mockResolvedValue({
+      ...baseEnvelope,
+      status: 'SIGNED',
+      completedAt: new Date('2024-01-02T12:00:00Z'),
+    });
+    mockSignatureProvider.validateWebhook.mockReturnValue(true);
+    mockSignatureProvider.parseWebhookEvent.mockImplementation((payload: unknown) => ({
+      envelopeId: (payload as { envelopeId?: string })?.envelopeId ?? baseEnvelope.envelopeId,
+      documentId: baseEnvelope.documentId,
+      signingUrl: baseEnvelope.signingUrl,
+      status: 'SIGNED',
+      sentAt: baseEnvelope.sentAt,
+      completedAt: new Date('2024-01-02T12:00:00Z'),
+      declinedAt: null,
+    }));
   });
 
   it('authenticates and returns tokens', async () => {
@@ -658,10 +697,26 @@ describe('API integration', () => {
     const approvalCreate = await request(app)
       .post(`/api/projects/${projectId}/approvals`)
       .set('Authorization', `Bearer ${consultantToken}`)
-      .send({ title: 'Cambio de alcance', description: 'Extender revisión a planta adicional' });
+      .send({
+        title: 'Cambio de alcance',
+        description: 'Extender revisión a planta adicional',
+        documentTemplateId: 'tpl-001',
+        signer: { name: 'Laura Client', email: 's3.client@example.com' },
+        redirectUrl: 'https://app.local/firma-finalizada',
+      });
     expect(approvalCreate.status).toBe(201);
     const approvalId = approvalCreate.body.id as number;
     expect(approvalCreate.body.status).toBe('PENDING');
+    expect(approvalCreate.body.signatureStatus).toBe('SENT');
+    expect(approvalCreate.body.signatureUrl).toBeNull();
+    expect(mockSignatureProvider.createEnvelope).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Cambio de alcance',
+        documentTemplateId: 'tpl-001',
+        callbackUrl: 'http://localhost:3000/api/signatures/webhook',
+        projectId,
+      })
+    );
 
     const invalidTransition = await request(app)
       .patch(`/api/projects/${projectId}/approvals/${approvalId}`)
@@ -676,6 +731,22 @@ describe('API integration', () => {
     expect(approvalDecision.status).toBe(200);
     expect(approvalDecision.body.status).toBe('APPROVED');
     expect(approvalDecision.body.decidedById).toBe(adminUser.id);
+    expect(approvalDecision.body.signatureStatus).toBe('SIGNED');
+    expect(approvalDecision.body.signatureUrl).toBeNull();
+    expect(mockSignatureProvider.getEnvelopeStatus).toHaveBeenCalledWith('env-123');
+
+    const approvalsForConsultant = await request(app)
+      .get(`/api/projects/${projectId}/approvals`)
+      .set('Authorization', `Bearer ${consultantToken}`);
+    expect(approvalsForConsultant.status).toBe(200);
+    expect(approvalsForConsultant.body[0].signatureUrl).toBeNull();
+
+    const approvalsForClient = await request(app)
+      .get(`/api/projects/${projectId}/approvals`)
+      .set('Authorization', `Bearer ${clientToken}`);
+    expect(approvalsForClient.status).toBe(200);
+    expect(approvalsForClient.body[0].signatureUrl).toBe('https://sign.example.com/envelope/env-123');
+    expect(approvalsForClient.body[0].signatureStatus).toBe('SIGNED');
 
     const listResponse = await request(app)
       .get(`/api/projects/${projectId}/data-requests`)
@@ -703,6 +774,90 @@ describe('API integration', () => {
     const notFoundResponse = await request(app).get('/totally-unknown-route');
     expect(notFoundResponse.status).toBe(404);
     expect(notFoundResponse.body).toEqual({ message: 'Not found' });
+  });
+
+  it('prevents approval transition when signature is not completed', async () => {
+    const { accessToken } = await loginAdmin();
+
+    const projectResponse = await request(app)
+      .post('/api/projects')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ companyId: 1, name: 'Proyecto con firmas' });
+    expect(projectResponse.status).toBe(201);
+    const projectId = projectResponse.body.id as number;
+
+    const approvalCreate = await request(app)
+      .post(`/api/projects/${projectId}/approvals`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        title: 'Actualización contractual',
+        documentTemplateId: 'tpl-guarded',
+        signer: { name: 'Cliente Control', email: 'admin@example.com' },
+      });
+    expect(approvalCreate.status).toBe(201);
+    const approvalId = approvalCreate.body.id as number;
+
+    mockSignatureProvider.getEnvelopeStatus.mockResolvedValueOnce({
+      envelopeId: 'env-123',
+      documentId: 'doc-123',
+      signingUrl: 'https://sign.example.com/envelope/env-123',
+      status: 'SENT',
+      sentAt: new Date('2024-01-01T12:00:00Z'),
+      completedAt: null,
+      declinedAt: null,
+    });
+
+    const approvalDecision = await request(app)
+      .patch(`/api/projects/${projectId}/approvals/${approvalId}`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ status: 'APPROVED' });
+
+    expect(approvalDecision.status).toBe(400);
+    expect(approvalDecision.body.message).toBe('Cannot approve until the signature is completed');
+  });
+
+  it('processes signature webhook callbacks and updates approval state', async () => {
+    const { accessToken } = await loginAdmin();
+
+    const projectResponse = await request(app)
+      .post('/api/projects')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ companyId: 1, name: 'Proyecto webhook' });
+    expect(projectResponse.status).toBe(201);
+    const projectId = projectResponse.body.id as number;
+
+    const approvalCreate = await request(app)
+      .post(`/api/projects/${projectId}/approvals`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        title: 'Firma de anexo',
+        documentTemplateId: 'tpl-webhook',
+        signer: { name: 'Web Hook', email: 'admin@example.com' },
+      });
+    expect(approvalCreate.status).toBe(201);
+    const approvalId = approvalCreate.body.id as number;
+
+    mockSignatureProvider.parseWebhookEvent.mockImplementationOnce(() => ({
+      envelopeId: 'env-123',
+      documentId: 'doc-999',
+      signingUrl: 'https://sign.example.com/envelope/env-123',
+      status: 'SIGNED',
+      sentAt: new Date('2024-01-01T12:00:00Z'),
+      completedAt: new Date('2024-01-03T12:00:00Z'),
+      declinedAt: null,
+    }));
+
+    const webhookResponse = await request(app)
+      .post('/api/signatures/webhook')
+      .set('x-signature-secret', 'signature-secret')
+      .send({ envelopeId: 'env-123', status: 'completed' });
+
+    expect(webhookResponse.status).toBe(200);
+
+    const updatedApproval = await prisma.approval.findUnique({ where: { id: approvalId } });
+    expect(updatedApproval?.signatureStatus).toBe('SIGNED');
+    expect(updatedApproval?.signatureDocumentId).toBe('doc-999');
+    expect(updatedApproval?.signatureCompletedAt).not.toBeNull();
   });
 
   it('manages initiatives end-to-end with permissions and validations', async () => {
