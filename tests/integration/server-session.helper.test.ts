@@ -1,18 +1,14 @@
 import type { SessionPayload } from '../../apps/web/src/lib/auth/session';
 import { fetchServerSession } from '../../apps/web/src/lib/auth/server-session';
-import { cookies, headers } from 'next/headers';
-
-jest.mock('next/headers', () => ({
-  headers: jest.fn(),
-  cookies: jest.fn(),
-}));
+import { __resetCookiesStore, cookies, headers } from 'next/headers';
 
 describe('fetchServerSession', () => {
   const originalFetch = global.fetch;
-  const headersMock = headers as unknown as jest.Mock;
-  const cookiesMock = cookies as unknown as jest.Mock;
+  const headersMock = headers as jest.MockedFunction<typeof headers>;
+  const cookiesMock = cookies as jest.MockedFunction<typeof cookies>;
 
   beforeEach(() => {
+    __resetCookiesStore();
     headersMock.mockReturnValue({
       get: (key: string) => {
         if (key === 'host') {
@@ -24,14 +20,13 @@ describe('fetchServerSession', () => {
         return null;
       },
     });
-    cookiesMock.mockReturnValue({
-      getAll: () => [{ name: 'ams.session', value: 'encoded-session' }],
-    });
+    const cookieStore = cookiesMock();
+    cookieStore.set({ name: 'ams.session', value: 'encoded-session' });
   });
 
   afterEach(() => {
     global.fetch = originalFetch;
-    jest.resetAllMocks();
+    jest.clearAllMocks();
   });
 
   it('refreshes the session when access token expired but refresh token is valid', async () => {
