@@ -1,12 +1,6 @@
 import { differenceInCalendarDays } from 'date-fns';
 import { z } from 'zod';
-import prisma, {
-  Initiative,
-  InitiativeAssignment,
-  InitiativeStatus,
-  InitiativeType,
-  User,
-} from '@/lib/prisma';
+import prisma, { Initiative, InitiativeAssignment, InitiativeType, User } from '@/lib/prisma';
 import { ensureProjectAccess } from '@/services/projectService';
 
 const initiativeTypeSchema = z.enum(['QUICK_WIN', 'POC', 'PROJECT']);

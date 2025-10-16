@@ -96,7 +96,7 @@ Para los cimientos multi-tenant el seed genera el tenant `Acme Consulting`, su �
 
 Se incluyen pruebas unitarias, de integración y ahora también de extremo a extremo (Playwright) que cubren autenticación, overview, solicitudes de información, riesgos, hallazgos y aprobaciones. Ejecuta `npm run accept` para validar la calidad antes de desplegar.
 
-La última corrida de `npm test` (Jest con cobertura habilitada por defecto) reporta 81.84 % de *statements* y 81.26 % de líneas cubiertas. El reporte en `coverage/lcov-report` puede publicarse automáticamente en CI junto con los artefactos de Playwright (`playwright-report`).
+La última corrida de `npm test` (Jest con cobertura habilitada por defecto) reporta 93.01 % de *statements* y 93.05 % de líneas cubiertas sobre servicios, middleware y utilidades. El reporte en `coverage/lcov-report` puede publicarse automáticamente en CI junto con los artefactos de Playwright (`playwright-report`).
 
 El endpoint `/metrics` permite integrar el backend con Prometheus desde el primer día. Incluye conteos totales y por estado de proyectos, solicitudes y aprobaciones para monitorear la operación.
 

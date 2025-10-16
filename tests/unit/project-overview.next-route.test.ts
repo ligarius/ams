@@ -2,6 +2,7 @@ import { GET } from '../../apps/web/src/app/api/projects/[projectId]/overview/ro
 import prisma, { resetDatabase } from '@/lib/prisma';
 import { createProject } from '@/services/projectService';
 import type { ProjectOverview } from '@/services/projectService';
+import type { SessionPayload } from '../../apps/web/src/lib/auth/session';
 import { ensureSession, clearSessionCookie } from '../../apps/web/src/lib/auth/session';
 
 jest.mock('../../apps/web/src/lib/auth/session', () => ({
@@ -11,6 +12,12 @@ jest.mock('../../apps/web/src/lib/auth/session', () => ({
 
 const ensureSessionMock = ensureSession as jest.MockedFunction<typeof ensureSession>;
 const clearSessionCookieMock = clearSessionCookie as jest.MockedFunction<typeof clearSessionCookie>;
+
+const buildSession = (userId: number, role: string, email: string): SessionPayload => ({
+  accessToken: 'access-token',
+  refreshToken: 'refresh-token',
+  user: { id: userId, email, role },
+});
 
 describe('apps/web project overview API route', () => {
   beforeEach(() => {
@@ -24,7 +31,7 @@ describe('apps/web project overview API route', () => {
 
     const project = await createProject({ companyId: 1, name: 'Next Overview Project' }, admin!);
 
-    ensureSessionMock.mockResolvedValue({ user: { id: admin!.id } } as any);
+    ensureSessionMock.mockResolvedValue(buildSession(admin!.id, admin!.role, admin!.email));
 
     const response = await GET(new Request('http://localhost/api/projects/overview'), {
       params: { projectId: String(project.id) },
@@ -44,7 +51,7 @@ describe('apps/web project overview API route', () => {
     const admin = await prisma.user.findUnique({ where: { email: 'admin@example.com' } });
     expect(admin).not.toBeNull();
 
-    ensureSessionMock.mockResolvedValue({ user: { id: admin!.id } } as any);
+    ensureSessionMock.mockResolvedValue(buildSession(admin!.id, admin!.role, admin!.email));
 
     const response = await GET(new Request('http://localhost/api/projects/9999/overview'), {
       params: { projectId: '9999' },
@@ -66,7 +73,7 @@ describe('apps/web project overview API route', () => {
 
     const project = await createProject({ companyId: 1, name: 'Restricted Project' }, admin!);
 
-    ensureSessionMock.mockResolvedValue({ user: { id: outsider.id } } as any);
+    ensureSessionMock.mockResolvedValue(buildSession(outsider.id, outsider.role, outsider.email));
 
     const response = await GET(new Request('http://localhost/api/projects/overview'), {
       params: { projectId: String(project.id) },
@@ -79,7 +86,7 @@ describe('apps/web project overview API route', () => {
   });
 
   it('clears the session cookie when the user no longer exists', async () => {
-    ensureSessionMock.mockResolvedValue({ user: { id: 9999 } } as any);
+    ensureSessionMock.mockResolvedValue(buildSession(9999, 'ADMIN', 'missing@example.com'));
 
     const response = await GET(new Request('http://localhost/api/projects/overview'), {
       params: { projectId: '1' },

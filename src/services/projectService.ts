@@ -24,7 +24,6 @@ import { buildPrioritizationMatrix, type PrioritizationMatrix } from '@/services
 
 const RISK_LEVELS: RiskLevel[] = ['LOW', 'MEDIUM', 'HIGH'];
 const DATA_REQUEST_STATUSES: DataRequestStatus[] = ['PENDING', 'IN_REVIEW', 'APPROVED', 'REJECTED'];
-const APPROVAL_STATUSES: ApprovalStatus[] = ['PENDING', 'APPROVED', 'REJECTED'];
 const SIGNATURE_STATUSES: SignatureStatus[] = ['PENDING', 'SENT', 'SIGNED', 'REJECTED'];
 const ACTIVE_FINDING_STATUSES: FindingStatus[] = ['OPEN', 'IN_REVIEW'];
 
