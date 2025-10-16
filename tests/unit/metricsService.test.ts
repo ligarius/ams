@@ -3,6 +3,19 @@ import { createProject } from '@/services/projectService';
 import { createDataRequest, updateDataRequest } from '@/services/dataRequestService';
 import { createApproval, transitionApproval } from '@/services/approvalService';
 import collectPrometheusMetrics from '@/services/metricsService';
+import signatureProvider from '@/services/signatureProvider';
+
+jest.mock('@/services/signatureProvider', () => ({
+  __esModule: true,
+  default: {
+    createEnvelope: jest.fn(),
+    getEnvelopeStatus: jest.fn(),
+    validateWebhook: jest.fn(),
+    parseWebhookEvent: jest.fn(),
+  },
+}));
+
+const mockSignatureProvider = signatureProvider as jest.Mocked<typeof signatureProvider>;
 
 describe('metricsService', () => {
   let admin: User;
@@ -18,6 +31,24 @@ describe('metricsService', () => {
       },
       admin
     );
+    mockSignatureProvider.createEnvelope.mockResolvedValue({
+      envelopeId: 'env-metrics',
+      documentId: 'doc-metrics',
+      signingUrl: 'https://sign.example.com/envelope/env-metrics',
+      status: 'SENT',
+      sentAt: new Date('2024-01-01T12:00:00Z'),
+      completedAt: null,
+      declinedAt: null,
+    });
+    mockSignatureProvider.getEnvelopeStatus.mockResolvedValue({
+      envelopeId: 'env-metrics',
+      documentId: 'doc-metrics',
+      signingUrl: 'https://sign.example.com/envelope/env-metrics',
+      status: 'SIGNED',
+      sentAt: new Date('2024-01-01T12:00:00Z'),
+      completedAt: new Date('2024-01-02T12:00:00Z'),
+      declinedAt: null,
+    });
   });
 
   it('aggregates counts and formats prometheus metrics', async () => {
@@ -45,6 +76,8 @@ describe('metricsService', () => {
       {
         title: 'Extensión de alcance',
         description: 'Incluir proceso adicional en revisión',
+        documentTemplateId: 'tpl-metrics',
+        signer: { name: 'Admin Metrics', email: 'admin@example.com' },
       },
       admin
     );

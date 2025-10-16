@@ -12,6 +12,7 @@ import type {
   GovernanceType,
   RiskLevel,
   RiskStatus,
+  SignatureStatus,
 } from '@backend/lib/prisma';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
@@ -125,6 +126,15 @@ const approvalStatusLabels: Record<ApprovalStatus, { label: string; color: ChipP
   REJECTED: { label: 'Rechazada', color: 'error' },
 };
 
+const signatureStatusLabels: Record<SignatureStatus, { label: string; color: ChipProps['color'] }> = {
+  PENDING: { label: 'Preparando firma', color: 'default' },
+  SENT: { label: 'Enviada', color: 'info' },
+  SIGNED: { label: 'Firmada', color: 'success' },
+  REJECTED: { label: 'Rechazada', color: 'error' },
+};
+
+const signatureStatusOrder: SignatureStatus[] = ['PENDING', 'SENT', 'SIGNED', 'REJECTED'];
+
 const DAY_IN_MS = 1000 * 60 * 60 * 24;
 
 const getBaseUrl = () => {
@@ -189,6 +199,25 @@ function formatNextMeeting(nextMeetingAt: string | null): string {
   }
   const suffix = diffDays === -1 ? 'día' : 'días';
   return `La última reunión fue hace ${Math.abs(diffDays)} ${suffix} (${dateFormatter.format(date)})`;
+}
+
+function describeSignatureStatus(approval: ProjectOverview['approvals']['recent'][number]): string {
+  switch (approval.signatureStatus) {
+    case 'SIGNED':
+      return approval.signatureCompletedAt
+        ? `Firmada el ${dateFormatter.format(new Date(approval.signatureCompletedAt))}`
+        : 'Firma completada';
+    case 'SENT':
+      return approval.signatureSentAt
+        ? `Enviada para firma el ${dateFormatter.format(new Date(approval.signatureSentAt))}`
+        : 'Solicitud de firma enviada';
+    case 'REJECTED':
+      return approval.signatureDeclinedAt
+        ? `Firma rechazada el ${dateFormatter.format(new Date(approval.signatureDeclinedAt))}`
+        : 'Firma rechazada por el destinatario';
+    default:
+      return 'Documento en preparación para firma';
+  }
 }
 
 function formatKpiValue(value: number, unit: string): string {
@@ -384,6 +413,20 @@ export default async function ProjectOverviewPage({ params }: PageProps) {
                 </Stack>
                 <Chip size="small" variant="outlined" label="Pendientes" color="warning" />
               </Stack>
+              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                {signatureStatusOrder.map((status) => {
+                  const config = signatureStatusLabels[status];
+                  return (
+                    <Chip
+                      key={status}
+                      size="small"
+                      color={config.color}
+                      variant="outlined"
+                      label={`${config.label}: ${overview.approvals.signature[status]}`}
+                    />
+                  );
+                })}
+              </Stack>
               {overview.approvals.recent.length === 0 ? (
                 <Typography variant="body2" color="text.secondary">
                   Aún no se han registrado aprobaciones. Los flujos creados desde el backend aparecerán aquí.
@@ -392,19 +435,57 @@ export default async function ProjectOverviewPage({ params }: PageProps) {
                 <Stack spacing={1.5} divider={<Divider flexItem />}>
                   {overview.approvals.recent.slice(0, 3).map((approval) => {
                     const config = approvalStatusLabels[approval.status];
+                    const signatureConfig = signatureStatusLabels[approval.signatureStatus];
                     return (
-                      <Stack key={approval.id} spacing={0.5}>
-                        <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
+                      <Stack key={approval.id} spacing={1}>
+                        <Stack
+                          direction={{ xs: 'column', sm: 'row' }}
+                          spacing={1}
+                          alignItems={{ xs: 'flex-start', sm: 'center' }}
+                          justifyContent="space-between"
+                        >
                           <Typography variant="body2" fontWeight={600} sx={{ wordBreak: 'break-word' }}>
                             {approval.title}
                           </Typography>
-                          <Chip size="small" label={config.label} color={config.color} variant="outlined" />
+                          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap justifyContent="flex-end">
+                            <Chip size="small" label={config.label} color={config.color} variant="outlined" />
+                            <Chip
+                              size="small"
+                              label={signatureConfig.label}
+                              color={signatureConfig.color}
+                              variant="outlined"
+                            />
+                          </Stack>
                         </Stack>
-                        <Typography variant="caption" color="text.secondary">
-                          {approval.decidedAt
-                            ? `Decidido el ${dateFormatter.format(new Date(approval.decidedAt))}`
-                            : 'En espera de decisión'}
-                        </Typography>
+                        <Stack
+                          direction={{ xs: 'column', sm: 'row' }}
+                          spacing={1}
+                          alignItems={{ xs: 'flex-start', sm: 'center' }}
+                          justifyContent="space-between"
+                        >
+                          <Stack spacing={0.5}>
+                            <Typography variant="caption" color="text.secondary">
+                              {approval.decidedAt
+                                ? `Decidido el ${dateFormatter.format(new Date(approval.decidedAt))}`
+                                : 'En espera de decisión'}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {describeSignatureStatus(approval)}
+                            </Typography>
+                          </Stack>
+                          {approval.signatureUrl ? (
+                            <Button
+                              size="small"
+                              variant="contained"
+                              component="a"
+                              href={approval.signatureUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              Firmar documento
+                            </Button>
+                          ) : null}
+                        </Stack>
                       </Stack>
                     );
                   })}

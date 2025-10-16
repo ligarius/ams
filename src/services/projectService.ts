@@ -17,6 +17,7 @@ import prisma, {
   Project,
   RiskLevel,
   RiskStatus,
+  SignatureStatus,
   User,
 } from '@/lib/prisma';
 import { buildPrioritizationMatrix, type PrioritizationMatrix } from '@/services/prioritizationService';
@@ -24,6 +25,7 @@ import { buildPrioritizationMatrix, type PrioritizationMatrix } from '@/services
 const RISK_LEVELS: RiskLevel[] = ['LOW', 'MEDIUM', 'HIGH'];
 const DATA_REQUEST_STATUSES: DataRequestStatus[] = ['PENDING', 'IN_REVIEW', 'APPROVED', 'REJECTED'];
 const APPROVAL_STATUSES: ApprovalStatus[] = ['PENDING', 'APPROVED', 'REJECTED'];
+const SIGNATURE_STATUSES: SignatureStatus[] = ['PENDING', 'SENT', 'SIGNED', 'REJECTED'];
 const ACTIVE_FINDING_STATUSES: FindingStatus[] = ['OPEN', 'IN_REVIEW'];
 
 const isoDateSchema = z
@@ -411,11 +413,17 @@ export interface ProjectOverview {
   }>;
   approvals: {
     pending: number;
+    signature: Record<SignatureStatus, number>;
     recent: Array<{
       id: number;
       title: string;
       status: ApprovalStatus;
       decidedAt: string | null;
+      signatureStatus: SignatureStatus;
+      signatureUrl: string | null;
+      signatureSentAt: string | null;
+      signatureCompletedAt: string | null;
+      signatureDeclinedAt: string | null;
     }>;
   };
   prioritization: PrioritizationMatrix;
@@ -638,6 +646,11 @@ export const getProjectOverview = async (projectId: number, actor: User): Promis
       riskTitle: riskLookup.get(finding.riskId) ?? null,
     }));
 
+  const signatureCounts = SIGNATURE_STATUSES.reduce<Record<SignatureStatus, number>>((acc, status) => {
+    acc[status] = approvals.filter((approval) => approval.signatureStatus === status).length;
+    return acc;
+  }, {} as Record<SignatureStatus, number>);
+
   const pendingApprovals = approvals.filter((approval) => approval.status === 'PENDING').length;
   const recentApprovals = approvals
     .slice()
@@ -648,6 +661,11 @@ export const getProjectOverview = async (projectId: number, actor: User): Promis
       title: approval.title,
       status: approval.status,
       decidedAt: approval.decidedAt ? approval.decidedAt.toISOString() : null,
+      signatureStatus: approval.signatureStatus,
+      signatureUrl: actor.role === 'CLIENT' ? approval.signatureUrl : null,
+      signatureSentAt: approval.signatureSentAt ? approval.signatureSentAt.toISOString() : null,
+      signatureCompletedAt: approval.signatureCompletedAt ? approval.signatureCompletedAt.toISOString() : null,
+      signatureDeclinedAt: approval.signatureDeclinedAt ? approval.signatureDeclinedAt.toISOString() : null,
     }));
 
   return {
@@ -670,6 +688,7 @@ export const getProjectOverview = async (projectId: number, actor: User): Promis
     outstandingFindings,
     approvals: {
       pending: pendingApprovals,
+      signature: signatureCounts,
       recent: recentApprovals,
     },
     prioritization,

@@ -6,6 +6,7 @@ import authRoutes from '@/routes/authRoutes';
 import userRoutes from '@/routes/userRoutes';
 import projectRoutes from '@/routes/projectRoutes';
 import companyRoutes from '@/routes/companyRoutes';
+import signatureRoutes from '@/routes/signatureRoutes';
 import { cacheControlMiddleware } from '@/middleware/cacheControl';
 import { errorHandler } from '@/middleware/errorHandler';
 import logger from '@/lib/logger';
@@ -66,6 +67,7 @@ export const createApp = () => {
   app.use('/api/auth', authRoutes);
   app.use('/api/users', userRoutes);
   app.use('/api/companies', companyRoutes);
+  app.use('/api/signatures', signatureRoutes);
   app.use('/api/projects', projectRoutes);
 
   app.use((_req, res) => {

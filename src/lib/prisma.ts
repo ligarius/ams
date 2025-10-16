@@ -64,6 +64,7 @@ export type GovernanceType = 'STEERING_COMMITTEE' | 'WORKING_GROUP' | 'SPONSOR_C
 export type DataRequestStatus = 'PENDING' | 'IN_REVIEW' | 'APPROVED' | 'REJECTED';
 export type FindingStatus = 'OPEN' | 'IN_REVIEW' | 'RESOLVED';
 export type ApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+export type SignatureStatus = 'PENDING' | 'SENT' | 'SIGNED' | 'REJECTED';
 export type TenantStatus = 'ACTIVE' | 'INACTIVE';
 export type ContractStatus = 'DRAFT' | 'ACTIVE' | 'SUSPENDED' | 'CLOSED';
 export type CurrencyCode = 'USD' | 'EUR' | 'CLP' | 'MXN' | 'COP';
@@ -204,6 +205,13 @@ export interface Approval {
   createdById: number;
   decidedById: number | null;
   decidedAt: Date | null;
+  signatureEnvelopeId: string | null;
+  signatureDocumentId: string | null;
+  signatureUrl: string | null;
+  signatureStatus: SignatureStatus;
+  signatureSentAt: Date | null;
+  signatureCompletedAt: Date | null;
+  signatureDeclinedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -1116,8 +1124,13 @@ class ApprovalModel {
       .map((approval) => ({ ...approval }));
   }
 
-  async findUnique(params: { where: { id: number } }): Promise<Approval | null> {
-    const approval = state.approvals.find((item) => item.id === params.where.id);
+  async findUnique(params: { where: { id?: number; signatureEnvelopeId?: string } }): Promise<Approval | null> {
+    const { id, signatureEnvelopeId } = params.where;
+    const approval = state.approvals.find(
+      (item) =>
+        (id === undefined || item.id === id) &&
+        (signatureEnvelopeId === undefined || item.signatureEnvelopeId === signatureEnvelopeId)
+    );
     return approval ? { ...approval } : null;
   }
 
@@ -1128,6 +1141,13 @@ class ApprovalModel {
       description?: string | null;
       status?: ApprovalStatus;
       createdById: number;
+      signatureEnvelopeId?: string | null;
+      signatureDocumentId?: string | null;
+      signatureUrl?: string | null;
+      signatureStatus?: SignatureStatus;
+      signatureSentAt?: Date | null;
+      signatureCompletedAt?: Date | null;
+      signatureDeclinedAt?: Date | null;
     };
   }): Promise<Approval> {
     const timestamp = now();
@@ -1140,6 +1160,13 @@ class ApprovalModel {
       createdById: params.data.createdById,
       decidedById: null,
       decidedAt: null,
+      signatureEnvelopeId: params.data.signatureEnvelopeId ?? null,
+      signatureDocumentId: params.data.signatureDocumentId ?? null,
+      signatureUrl: params.data.signatureUrl ?? null,
+      signatureStatus: params.data.signatureStatus ?? 'PENDING',
+      signatureSentAt: params.data.signatureSentAt ?? null,
+      signatureCompletedAt: params.data.signatureCompletedAt ?? null,
+      signatureDeclinedAt: params.data.signatureDeclinedAt ?? null,
       createdAt: timestamp,
       updatedAt: timestamp,
     };
@@ -1150,7 +1177,23 @@ class ApprovalModel {
 
   async update(params: {
     where: { id: number };
-    data: Partial<Pick<Approval, 'title' | 'description' | 'status' | 'decidedById' | 'decidedAt'>>;
+    data: Partial<
+      Pick<
+        Approval,
+        | 'title'
+        | 'description'
+        | 'status'
+        | 'decidedById'
+        | 'decidedAt'
+        | 'signatureEnvelopeId'
+        | 'signatureDocumentId'
+        | 'signatureUrl'
+        | 'signatureStatus'
+        | 'signatureSentAt'
+        | 'signatureCompletedAt'
+        | 'signatureDeclinedAt'
+      >
+    >;
   }): Promise<Approval> {
     const approval = state.approvals.find((item) => item.id === params.where.id);
     if (!approval) {
@@ -1170,6 +1213,27 @@ class ApprovalModel {
     }
     if (params.data.decidedAt !== undefined) {
       approval.decidedAt = params.data.decidedAt;
+    }
+    if (params.data.signatureEnvelopeId !== undefined) {
+      approval.signatureEnvelopeId = params.data.signatureEnvelopeId;
+    }
+    if (params.data.signatureDocumentId !== undefined) {
+      approval.signatureDocumentId = params.data.signatureDocumentId;
+    }
+    if (params.data.signatureUrl !== undefined) {
+      approval.signatureUrl = params.data.signatureUrl;
+    }
+    if (params.data.signatureStatus !== undefined) {
+      approval.signatureStatus = params.data.signatureStatus;
+    }
+    if (params.data.signatureSentAt !== undefined) {
+      approval.signatureSentAt = params.data.signatureSentAt;
+    }
+    if (params.data.signatureCompletedAt !== undefined) {
+      approval.signatureCompletedAt = params.data.signatureCompletedAt;
+    }
+    if (params.data.signatureDeclinedAt !== undefined) {
+      approval.signatureDeclinedAt = params.data.signatureDeclinedAt;
     }
     approval.updatedAt = now();
     logOperation('approval', 'update', { id: approval.id });
