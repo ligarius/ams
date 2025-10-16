@@ -29,4 +29,5 @@ declare module 'next/headers' {
 
   export function headers(): ReadonlyHeaders;
   export function cookies(): RequestCookies;
+  export function __resetCookiesStore(): void;
 }
