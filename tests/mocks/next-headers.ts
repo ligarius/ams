@@ -14,6 +14,12 @@ interface CookieSetOptions {
   expires?: Date;
 }
 
+interface CookieDeleteOptions {
+  name: string;
+  path?: string;
+  domain?: string;
+}
+
 type CookieStoreEntry = CookieValue & CookieSetOptions;
 type CookieSetInput = CookieStoreEntry;
 
@@ -29,10 +35,19 @@ const prepareForStore = ({ expires, ...rest }: CookieStoreEntry): CookieStoreEnt
   ...(expires ? { expires: new Date(expires) } : {}),
 });
 
-const findCookieIndex = (name: string) => cookieStore.findIndex((cookie) => cookie.name === name);
+const matchesIdentity = (
+  entry: CookieStoreEntry,
+  identity: CookieDeleteOptions
+) =>
+  entry.name === identity.name &&
+  (identity.path === undefined || entry.path === identity.path) &&
+  (identity.domain === undefined || entry.domain === identity.domain);
 
-const resolveName = (input: string | CookieSetInput) =>
-  typeof input === 'string' ? input : input.name;
+const findCookieIndex = (identity: CookieDeleteOptions) =>
+  cookieStore.findIndex((cookie) => matchesIdentity(cookie, identity));
+
+const resolveIdentity = (input: string | CookieDeleteOptions): CookieDeleteOptions =>
+  typeof input === 'string' ? { name: input } : input;
 
 const normaliseSetInput = (
   nameOrOptions: string | CookieSetInput,
@@ -69,22 +84,24 @@ export const cookies = jest.fn(() => {
     options?: CookieSetOptions
   ) => {
     const normalised = normaliseSetInput(nameOrOptions, value, options);
-    const index = findCookieIndex(normalised.name);
+    const identity = resolveIdentity(normalised);
     const entry = prepareForStore(normalised);
+    const index = findCookieIndex(identity);
     if (index === -1) {
       cookieStore.push(entry);
       return;
     }
     cookieStore[index] = entry;
   };
-  const remove = (nameOrOptions: string | CookieSetInput) => {
-    const index = findCookieIndex(resolveName(nameOrOptions));
+  const remove = (nameOrOptions: string | CookieDeleteOptions) => {
+    const identity = resolveIdentity(nameOrOptions);
+    const index = findCookieIndex(identity);
     if (index === -1) {
       return;
     }
     cookieStore.splice(index, 1);
   };
-  const has = (name: string) => findCookieIndex(name) !== -1;
+  const has = (name: string) => cookieStore.some((cookie) => cookie.name === name);
 
   return {
     getAll,

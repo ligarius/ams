@@ -42,6 +42,26 @@ describe('tests/mocks/next-headers', () => {
     expect(jar.has('removable-object')).toBe(false);
   });
 
+  it('respects path/domain identity when setting and deleting cookies', () => {
+    const jar = cookies();
+
+    jar.set({ name: 'scoped', value: 'root', path: '/' });
+    jar.set({ name: 'scoped', value: 'account', path: '/account' });
+    jar.set({ name: 'scoped', value: 'tenant', path: '/', domain: 'tenant.local' });
+
+    expect(jar.getAll('scoped')).toHaveLength(3);
+
+    jar.delete({ name: 'scoped', path: '/account' });
+    expect(jar.getAll('scoped')).toHaveLength(2);
+    expect(jar.getAll('scoped').find((cookie) => cookie.path === '/account')).toBeUndefined();
+
+    jar.set({ name: 'scoped', value: 'root-updated', path: '/' });
+    expect(jar.getAll('scoped').find((cookie) => cookie.path === '/')?.value).toBe('root-updated');
+
+    jar.delete('scoped');
+    expect(jar.getAll('scoped').map((cookie) => cookie.domain)).toEqual(['tenant.local']);
+  });
+
   it('keeps the shared store mutable across getAll results', () => {
     const jar = cookies();
 
