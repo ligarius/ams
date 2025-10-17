@@ -31,6 +31,9 @@ const prepareForStore = ({ expires, ...rest }: CookieStoreEntry): CookieStoreEnt
 
 const findCookieIndex = (name: string) => cookieStore.findIndex((cookie) => cookie.name === name);
 
+const resolveName = (input: string | CookieSetInput) =>
+  typeof input === 'string' ? input : input.name;
+
 const normaliseSetInput = (
   nameOrOptions: string | CookieSetInput,
   value?: string,
@@ -74,8 +77,8 @@ export const cookies = jest.fn(() => {
     }
     cookieStore[index] = entry;
   };
-  const remove = (name: string) => {
-    const index = findCookieIndex(name);
+  const remove = (nameOrOptions: string | CookieSetInput) => {
+    const index = findCookieIndex(resolveName(nameOrOptions));
     if (index === -1) {
       return;
     }

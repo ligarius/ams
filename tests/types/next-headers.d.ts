@@ -30,6 +30,7 @@ declare module 'next/headers' {
     set(name: string, value: string, options?: CookieSetOptions): void;
     set(options: RequestCookie): void;
     delete(name: string): void;
+    delete(options: RequestCookie): void;
     has(name: string): boolean;
   }
 
