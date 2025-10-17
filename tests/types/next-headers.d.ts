@@ -29,6 +29,8 @@ declare module 'next/headers' {
     domain?: string;
   }
 
+  type RequestCookie = CookieValue & CookieSetOptions;
+
   interface RequestCookies {
     getAll(): RequestCookie[];
     getAll(name: string): RequestCookie[];
