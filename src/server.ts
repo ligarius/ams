@@ -7,6 +7,7 @@ import userRoutes from '@/routes/userRoutes';
 import projectRoutes from '@/routes/projectRoutes';
 import companyRoutes from '@/routes/companyRoutes';
 import signatureRoutes from '@/routes/signatureRoutes';
+import portalRoutes from '@/routes/portalRoutes';
 import { cacheControlMiddleware } from '@/middleware/cacheControl';
 import { errorHandler } from '@/middleware/errorHandler';
 import logger from '@/lib/logger';
@@ -69,6 +70,7 @@ export const createApp = () => {
   app.use('/api/companies', companyRoutes);
   app.use('/api/signatures', signatureRoutes);
   app.use('/api/projects', projectRoutes);
+  app.use('/api/portal', portalRoutes);
 
   app.use((_req, res) => {
     res.status(404).json({ message: 'Not found' });
