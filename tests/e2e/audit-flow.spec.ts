@@ -3,13 +3,36 @@ import { AddressInfo } from 'net';
 import { test, expect, request as playwrightRequest } from '@playwright/test';
 import { createApp } from '@/server';
 import { resetDatabase } from '@/lib/prisma';
+import signatureProvider, { SignatureEnvelope } from '@/services/signatureProvider';
 
 let server: http.Server;
 let baseURL: string;
+let originalCreateEnvelope: typeof signatureProvider.createEnvelope;
+let originalGetEnvelopeStatus: typeof signatureProvider.getEnvelopeStatus;
+
+const signatureEnvelopeSent: SignatureEnvelope = {
+  envelopeId: 'env-playwright',
+  documentId: 'doc-playwright',
+  signingUrl: 'https://sign.local/envelope/env-playwright',
+  status: 'SENT',
+  sentAt: new Date('2024-01-01T12:00:00Z'),
+  completedAt: null,
+  declinedAt: null,
+};
+
+const signatureEnvelopeSigned: SignatureEnvelope = {
+  ...signatureEnvelopeSent,
+  status: 'SIGNED',
+  completedAt: new Date('2024-01-02T12:00:00Z'),
+};
 
 test.beforeAll(async () => {
   const app = createApp();
   server = http.createServer(app);
+  originalCreateEnvelope = signatureProvider.createEnvelope.bind(signatureProvider);
+  originalGetEnvelopeStatus = signatureProvider.getEnvelopeStatus.bind(signatureProvider);
+  signatureProvider.createEnvelope = async () => signatureEnvelopeSent;
+  signatureProvider.getEnvelopeStatus = async () => signatureEnvelopeSigned;
   await new Promise<void>((resolve) => {
     server.listen(0, '127.0.0.1', () => {
       const address = server.address() as AddressInfo;
@@ -20,6 +43,8 @@ test.beforeAll(async () => {
 });
 
 test.afterAll(async () => {
+  signatureProvider.createEnvelope = originalCreateEnvelope;
+  signatureProvider.getEnvelopeStatus = originalGetEnvelopeStatus;
   await new Promise<void>((resolve, reject) => {
     server.close((error) => {
       if (error) {
@@ -93,7 +118,13 @@ test('completa login, wizard, solicitud de información y aprobación end-to-end
 
     const approvalCreation = await api.post(`/api/projects/${projectId}/approvals`, {
       headers: { Authorization: `Bearer ${consultantToken}` },
-      data: { title: 'Extensión de alcance', description: 'Agregar auditoría de planta secundaria' },
+      data: {
+        title: 'Extensión de alcance',
+        description: 'Agregar auditoría de planta secundaria',
+        documentTemplateId: 'tpl-scope-change',
+        signer: { name: 'Sponsor Ejecutivo', email: 'sponsor@example.com' },
+        redirectUrl: 'https://app.local/approvals/callback',
+      },
     });
     expect(approvalCreation.ok()).toBeTruthy();
     const { id: approvalId } = await approvalCreation.json();
