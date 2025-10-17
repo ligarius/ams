@@ -234,6 +234,43 @@ describe('portalService', () => {
     expect(snapshot.totals.kpiAchievement.average).toBeCloseTo(0.2425, 5);
   });
 
+  it('ignores rejected data requests when computing workloads and alerts', async () => {
+    const pastDate = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+
+    await prisma.dataRequest.create({
+      data: {
+        projectId: projectA.id,
+        title: 'Rechazada por información incompleta',
+        dueDate: pastDate,
+        status: 'REJECTED',
+        createdById: admin.id,
+      },
+    });
+
+    const seededKpis = await prisma.projectKpi.findMany({ where: { projectId: projectA.id } });
+    for (const kpi of seededKpis) {
+      await prisma.projectKpi.create({
+        data: {
+          projectId: projectA.id,
+          name: `${kpi.name} adicional`,
+          target: kpi.target,
+          current: kpi.target * 2,
+          unit: kpi.unit,
+          trend: kpi.trend,
+        },
+      });
+    }
+
+    const snapshot = await getClientPortalSnapshot(admin);
+
+    const projectSummary = snapshot.projects.find((summary) => summary.project.id === projectA.id)!;
+
+    expect(projectSummary.workload.pendingDataRequests).toBe(0);
+    expect(projectSummary.workload.overdueDataRequests).toBe(0);
+    expect(projectSummary.alerts.filter((alert) => alert.type === 'DATA_REQUEST')).toHaveLength(0);
+    expect(projectSummary.status).toBe('ON_TRACK');
+  });
+
   it('restricts client users to their memberships', async () => {
     const client = await createUser('client-portal@example.com', 'CLIENT');
     await prisma.membership.create({ data: { projectId: projectA.id, userId: client.id, role: 'CLIENT' } });

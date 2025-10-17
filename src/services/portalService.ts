@@ -119,12 +119,14 @@ const computeKpiAchievement = (kpis: ProjectKpi[]): number | null => {
   return sum / ratios.length;
 };
 
+const ACTIVE_DATA_REQUEST_STATUSES: DataRequest['status'][] = ['PENDING', 'IN_REVIEW'];
+
 const computeDataRequestStats = (dataRequests: DataRequest[]) => {
   const now = Date.now();
   let pending = 0;
   let overdue = 0;
   for (const request of dataRequests) {
-    if (request.status !== 'APPROVED') {
+    if (ACTIVE_DATA_REQUEST_STATUSES.includes(request.status)) {
       pending += 1;
       if (request.dueDate && request.dueDate.getTime() < now) {
         overdue += 1;
@@ -164,7 +166,11 @@ const buildAlerts = (
   const now = Date.now();
 
   for (const request of dataRequests) {
-    if (request.status !== 'APPROVED' && request.dueDate && request.dueDate.getTime() < now) {
+    if (
+      ACTIVE_DATA_REQUEST_STATUSES.includes(request.status) &&
+      request.dueDate &&
+      request.dueDate.getTime() < now
+    ) {
       alerts.push({
         type: 'DATA_REQUEST',
         title: request.title,
