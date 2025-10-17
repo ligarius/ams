@@ -1050,4 +1050,128 @@ describe('API integration', () => {
     expect(missingRequestAttachments.status).toBe(404);
     expect(missingRequestAttachments.body.message).toBe('Data request not found');
   });
+
+  it('manages document repositories with versioning and controlled publication', async () => {
+    const { accessToken: adminToken } = await loginAdmin();
+
+    const consultantCreation = await request(app)
+      .post('/api/users')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ email: 'consultant-docs@example.com', password: 'Consult123!', role: 'CONSULTANT' });
+    expect(consultantCreation.status).toBe(201);
+
+    const clientCreation = await request(app)
+      .post('/api/users')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ email: 'client-docs@example.com', password: 'Client123!', role: 'CLIENT' });
+    expect(clientCreation.status).toBe(201);
+
+    const projectResponse = await request(app)
+      .post('/api/projects')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        companyId: 1,
+        name: 'Repositorio Sprint 6',
+        description: 'Validar control documental',
+        members: [
+          { userId: consultantCreation.body.id, role: 'CONSULTANT' },
+          { userId: clientCreation.body.id, role: 'CLIENT' },
+        ],
+        wizard: {},
+      });
+    expect(projectResponse.status).toBe(201);
+    const projectId = projectResponse.body.id;
+
+    const consultantLogin = await request(app).post('/api/auth/login').send({
+      email: 'consultant-docs@example.com',
+      password: 'Consult123!',
+    });
+    expect(consultantLogin.status).toBe(200);
+
+    const clientLogin = await request(app).post('/api/auth/login').send({
+      email: 'client-docs@example.com',
+      password: 'Client123!',
+    });
+    expect(clientLogin.status).toBe(200);
+
+    const documentCreation = await request(app)
+      .post(`/api/projects/${projectId}/documents`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        title: 'Acta Comité',
+        category: 'DELIVERABLE',
+        fileName: 'acta-v1.pdf',
+        content: 'Versión inicial',
+        tags: ['Comité', 'Auditoría'],
+        submitForReview: true,
+      });
+    expect(documentCreation.status).toBe(201);
+    expect(documentCreation.body.status).toBe('IN_REVIEW');
+    expect(documentCreation.body.latestVersion.version).toBe(1);
+    const documentId = documentCreation.body.id;
+
+    const documentList = await request(app)
+      .get(`/api/projects/${projectId}/documents`)
+      .set('Authorization', `Bearer ${adminToken}`);
+    expect(documentList.status).toBe(200);
+    expect(documentList.body).toHaveLength(1);
+    expect(documentList.body[0].latestVersion.fileName).toBe('acta-v1.pdf');
+
+    const approveResponse = await request(app)
+      .post(`/api/projects/${projectId}/documents/${documentId}/status`)
+      .set('Authorization', `Bearer ${consultantLogin.body.accessToken}`)
+      .send({ status: 'APPROVED' });
+    expect(approveResponse.status).toBe(200);
+    expect(approveResponse.body.status).toBe('APPROVED');
+
+    const unauthorizedPublish = await request(app)
+      .post(`/api/projects/${projectId}/documents/${documentId}/status`)
+      .set('Authorization', `Bearer ${consultantLogin.body.accessToken}`)
+      .send({ status: 'PUBLISHED' });
+    expect(unauthorizedPublish.status).toBe(403);
+
+    const publishResponse = await request(app)
+      .post(`/api/projects/${projectId}/documents/${documentId}/status`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ status: 'PUBLISHED' });
+    expect(publishResponse.status).toBe(200);
+    expect(publishResponse.body.status).toBe('PUBLISHED');
+
+    const versionResponse = await request(app)
+      .post(`/api/projects/${projectId}/documents/${documentId}/versions`)
+      .set('Authorization', `Bearer ${consultantLogin.body.accessToken}`)
+      .send({ fileName: 'acta-v2.pdf', content: 'Versión ajustada', submitForReview: true });
+    expect(versionResponse.status).toBe(201);
+    expect(versionResponse.body.latestVersion.version).toBe(2);
+    expect(versionResponse.body.status).toBe('IN_REVIEW');
+
+    const versionsList = await request(app)
+      .get(`/api/projects/${projectId}/documents/${documentId}/versions`)
+      .set('Authorization', `Bearer ${adminToken}`);
+    expect(versionsList.status).toBe(200);
+    expect(versionsList.body).toHaveLength(2);
+
+    const clientDeliverable = await request(app)
+      .post(`/api/projects/${projectId}/documents`)
+      .set('Authorization', `Bearer ${clientLogin.body.accessToken}`)
+      .send({
+        title: 'Entrega Cliente',
+        category: 'DELIVERABLE',
+        fileName: 'cliente.pdf',
+        content: 'Documento no permitido',
+      });
+    expect(clientDeliverable.status).toBe(403);
+
+    const clientEvidence = await request(app)
+      .post(`/api/projects/${projectId}/documents`)
+      .set('Authorization', `Bearer ${clientLogin.body.accessToken}`)
+      .send({
+        title: 'Evidencia Cliente',
+        category: 'EVIDENCE',
+        fileName: 'evidencia.txt',
+        content: 'Notas adjuntas',
+      });
+    expect(clientEvidence.status).toBe(201);
+    expect(clientEvidence.body.status).toBe('DRAFT');
+  });
 });

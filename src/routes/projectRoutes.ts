@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { authenticate, AuthenticatedRequest } from '@/middleware/authentication';
-import { DataRequestStatus } from '@/lib/prisma';
+import { DataRequestStatus, DocumentCategory, DocumentStatus } from '@/lib/prisma';
 import {
   createProject,
   getProjectOverview,
@@ -25,6 +25,15 @@ import {
   listInitiatives,
   updateInitiative,
 } from '@/services/initiativeService';
+import {
+  addProjectDocumentVersion,
+  createProjectDocument,
+  getProjectDocument,
+  listDocumentVersions,
+  listProjectDocuments,
+  transitionDocumentStatus,
+  updateProjectDocument,
+} from '@/services/documentService';
 
 const router = Router();
 
@@ -37,6 +46,9 @@ const parseNumericId = (value: string) => {
   }
   return id;
 };
+
+const DOCUMENT_STATUS_VALUES: DocumentStatus[] = ['DRAFT', 'IN_REVIEW', 'APPROVED', 'PUBLISHED'];
+const DOCUMENT_CATEGORY_VALUES: DocumentCategory[] = ['EVIDENCE', 'DELIVERABLE', 'POLICY', 'PROCEDURE'];
 
 router.get('/', async (req: AuthenticatedRequest, res) => {
   const projects = await listProjects(req.user!);
@@ -216,6 +228,191 @@ router.post('/:id/data-requests/:dataRequestId/files', async (req: Authenticated
       }
       if (error.message === 'Insufficient permissions') {
         return res.status(403).json({ message: error.message });
+      }
+      return res.status(400).json({ message: error.message });
+    }
+    return res.status(500).json({ message: 'Unexpected error' });
+  }
+});
+
+router.get('/:id/documents', async (req: AuthenticatedRequest, res) => {
+  try {
+    const projectId = parseNumericId(req.params.id);
+    const filters: { status?: DocumentStatus; category?: DocumentCategory } = {};
+    const { status: statusParam, category: categoryParam } = req.query;
+    if (statusParam !== undefined) {
+      if (typeof statusParam !== 'string' || !DOCUMENT_STATUS_VALUES.includes(statusParam as DocumentStatus)) {
+        return res.status(400).json({ message: 'Invalid status filter' });
+      }
+      filters.status = statusParam as DocumentStatus;
+    }
+    if (categoryParam !== undefined) {
+      if (typeof categoryParam !== 'string' || !DOCUMENT_CATEGORY_VALUES.includes(categoryParam as DocumentCategory)) {
+        return res.status(400).json({ message: 'Invalid category filter' });
+      }
+      filters.category = categoryParam as DocumentCategory;
+    }
+    const documents = await listProjectDocuments(projectId, req.user!, filters);
+    return res.json(documents);
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Invalid identifier') {
+      return res.status(400).json({ message: 'Invalid project id' });
+    }
+    if (error instanceof Error && error.message === 'Insufficient permissions') {
+      return res.status(403).json({ message: error.message });
+    }
+    return res.status(500).json({ message: 'Unexpected error' });
+  }
+});
+
+router.post('/:id/documents', async (req: AuthenticatedRequest, res) => {
+  try {
+    const projectId = parseNumericId(req.params.id);
+    const document = await createProjectDocument(projectId, req.body, req.user!);
+    return res.status(201).json(document);
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Invalid identifier') {
+      return res.status(400).json({ message: 'Invalid project id' });
+    }
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ message: 'Invalid payload', issues: error.flatten() });
+    }
+    if (error instanceof Error) {
+      if (error.message === 'Project not found') {
+        return res.status(404).json({ message: error.message });
+      }
+      if (error.message === 'Insufficient permissions' || error.message === 'Clients can only create evidence documents') {
+        return res.status(403).json({ message: error.message });
+      }
+      return res.status(400).json({ message: error.message });
+    }
+    return res.status(500).json({ message: 'Unexpected error' });
+  }
+});
+
+router.get('/:id/documents/:documentId', async (req: AuthenticatedRequest, res) => {
+  try {
+    const projectId = parseNumericId(req.params.id);
+    const documentId = parseNumericId(req.params.documentId);
+    const document = await getProjectDocument(projectId, documentId, req.user!);
+    return res.json(document);
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Invalid identifier') {
+      return res.status(400).json({ message: 'Invalid identifier' });
+    }
+    if (error instanceof Error) {
+      if (error.message === 'Document not found') {
+        return res.status(404).json({ message: error.message });
+      }
+      if (error.message === 'Insufficient permissions') {
+        return res.status(403).json({ message: error.message });
+      }
+      return res.status(400).json({ message: error.message });
+    }
+    return res.status(500).json({ message: 'Unexpected error' });
+  }
+});
+
+router.patch('/:id/documents/:documentId', async (req: AuthenticatedRequest, res) => {
+  try {
+    const projectId = parseNumericId(req.params.id);
+    const documentId = parseNumericId(req.params.documentId);
+    const document = await updateProjectDocument(projectId, documentId, req.body, req.user!);
+    return res.json(document);
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Invalid identifier') {
+      return res.status(400).json({ message: 'Invalid identifier' });
+    }
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ message: 'Invalid payload', issues: error.flatten() });
+    }
+    if (error instanceof Error) {
+      if (error.message === 'Document not found') {
+        return res.status(404).json({ message: error.message });
+      }
+      if (error.message === 'Insufficient permissions') {
+        return res.status(403).json({ message: error.message });
+      }
+      return res.status(400).json({ message: error.message });
+    }
+    return res.status(500).json({ message: 'Unexpected error' });
+  }
+});
+
+router.post('/:id/documents/:documentId/versions', async (req: AuthenticatedRequest, res) => {
+  try {
+    const projectId = parseNumericId(req.params.id);
+    const documentId = parseNumericId(req.params.documentId);
+    const document = await addProjectDocumentVersion(projectId, documentId, req.body, req.user!);
+    return res.status(201).json(document);
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Invalid identifier') {
+      return res.status(400).json({ message: 'Invalid identifier' });
+    }
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ message: 'Invalid payload', issues: error.flatten() });
+    }
+    if (error instanceof Error) {
+      if (error.message === 'Document not found') {
+        return res.status(404).json({ message: error.message });
+      }
+      if (error.message === 'Insufficient permissions') {
+        return res.status(403).json({ message: error.message });
+      }
+      return res.status(400).json({ message: error.message });
+    }
+    return res.status(500).json({ message: 'Unexpected error' });
+  }
+});
+
+router.get('/:id/documents/:documentId/versions', async (req: AuthenticatedRequest, res) => {
+  try {
+    const projectId = parseNumericId(req.params.id);
+    const documentId = parseNumericId(req.params.documentId);
+    const versions = await listDocumentVersions(projectId, documentId, req.user!);
+    return res.json(versions);
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Invalid identifier') {
+      return res.status(400).json({ message: 'Invalid identifier' });
+    }
+    if (error instanceof Error) {
+      if (error.message === 'Document not found') {
+        return res.status(404).json({ message: error.message });
+      }
+      if (error.message === 'Insufficient permissions') {
+        return res.status(403).json({ message: error.message });
+      }
+      return res.status(400).json({ message: error.message });
+    }
+    return res.status(500).json({ message: 'Unexpected error' });
+  }
+});
+
+router.post('/:id/documents/:documentId/status', async (req: AuthenticatedRequest, res) => {
+  try {
+    const projectId = parseNumericId(req.params.id);
+    const documentId = parseNumericId(req.params.documentId);
+    const document = await transitionDocumentStatus(projectId, documentId, req.body, req.user!);
+    return res.json(document);
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Invalid identifier') {
+      return res.status(400).json({ message: 'Invalid identifier' });
+    }
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ message: 'Invalid payload', issues: error.flatten() });
+    }
+    if (error instanceof Error) {
+      if (error.message === 'Document not found') {
+        return res.status(404).json({ message: error.message });
+      }
+      if (error.message === 'Insufficient permissions') {
+        return res.status(403).json({ message: error.message });
+      }
+      if (error.message === 'Invalid status transition' || error.message === 'Document already has requested status') {
+        return res.status(400).json({ message: error.message });
+      }
+      if (error.message === 'Document requires a version before approval') {
+        return res.status(400).json({ message: error.message });
       }
       return res.status(400).json({ message: error.message });
     }

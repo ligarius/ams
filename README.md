@@ -59,6 +59,11 @@ endpoint `POST /api/projects` y un resumen previo a la creación con objetivos, 
 - `GET /api/projects/:id/overview`: entrega KPIs, checklists, riesgos y gobernanza del proyecto.
 - `GET/POST/PATCH /api/projects/:id/data-requests`: gestión de solicitudes de información y su workflow de estados.
 - `POST/GET /api/projects/:id/data-requests/:dataRequestId/files`: adjuntos asociados a solicitudes.
+- `GET/POST /api/projects/:id/documents`: repositorio documental con metadatos, control de versiones y permisos por rol.
+- `GET /api/projects/:id/documents/:documentId`: detalle del documento con versión vigente e historial.
+- `POST /api/projects/:id/documents/:documentId/versions`: alta de nuevas versiones con validación de checksum.
+- `POST /api/projects/:id/documents/:documentId/status`: workflow de publicación (borrador, revisión, aprobación, publicación).
+- `GET /api/projects/:id/documents/:documentId/versions`: historial completo de versiones ordenado.
 - `GET/POST/PATCH /api/projects/:id/risks`: alta y seguimiento de riesgos.
 - `GET/POST/PATCH /api/projects/:id/findings`: hallazgos vinculados a riesgos y solicitudes.
 - `GET/POST/PATCH /api/projects/:id/approvals`: aprobaciones de cambios de alcance con historial.

@@ -241,6 +241,37 @@ export interface InitiativeAssignment {
   updatedAt: Date;
 }
 
+export type DocumentCategory = 'EVIDENCE' | 'DELIVERABLE' | 'POLICY' | 'PROCEDURE';
+export type DocumentStatus = 'DRAFT' | 'IN_REVIEW' | 'APPROVED' | 'PUBLISHED';
+
+export interface ProjectDocument {
+  id: number;
+  projectId: number;
+  title: string;
+  description: string | null;
+  category: DocumentCategory;
+  status: DocumentStatus;
+  tags: string[];
+  createdById: number;
+  updatedById: number;
+  currentVersionId: number | null;
+  publishedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface ProjectDocumentVersion {
+  id: number;
+  documentId: number;
+  version: number;
+  fileName: string;
+  content: string;
+  checksum: string;
+  note: string | null;
+  createdById: number;
+  createdAt: Date;
+}
+
 interface DatabaseState {
   tenants: Tenant[];
   tenantAreas: TenantArea[];
@@ -262,6 +293,8 @@ interface DatabaseState {
   approvals: Approval[];
   initiatives: Initiative[];
   initiativeAssignments: InitiativeAssignment[];
+  projectDocuments: ProjectDocument[];
+  projectDocumentVersions: ProjectDocumentVersion[];
   sequences: Record<string, number>;
 }
 
@@ -286,6 +319,8 @@ const createEmptyState = (): DatabaseState => ({
   approvals: [],
   initiatives: [],
   initiativeAssignments: [],
+  projectDocuments: [],
+  projectDocumentVersions: [],
   sequences: {},
 });
 
@@ -1378,6 +1413,149 @@ class InitiativeAssignmentModel {
   }
 }
 
+class ProjectDocumentModel {
+  async findMany(params: {
+    where: { projectId?: number; status?: DocumentStatus; category?: DocumentCategory };
+  }): Promise<ProjectDocument[]> {
+    const { projectId, status, category } = params.where;
+    return state.projectDocuments
+      .filter((document) => (projectId ? document.projectId === projectId : true))
+      .filter((document) => (status ? document.status === status : true))
+      .filter((document) => (category ? document.category === category : true))
+      .map((document) => ({ ...document, tags: [...document.tags] }));
+  }
+
+  async findUnique(params: { where: { id: number } }): Promise<ProjectDocument | null> {
+    const document = state.projectDocuments.find((item) => item.id === params.where.id);
+    return document ? { ...document, tags: [...document.tags] } : null;
+  }
+
+  async create(params: {
+    data: {
+      projectId: number;
+      title: string;
+      description?: string | null;
+      category: DocumentCategory;
+      status?: DocumentStatus;
+      tags?: string[];
+      createdById: number;
+      updatedById?: number;
+      currentVersionId?: number | null;
+      publishedAt?: Date | null;
+    };
+  }): Promise<ProjectDocument> {
+    const timestamp = now();
+    const document: ProjectDocument = {
+      id: nextId('projectDocuments'),
+      projectId: params.data.projectId,
+      title: params.data.title,
+      description: params.data.description ?? null,
+      category: params.data.category,
+      status: params.data.status ?? 'DRAFT',
+      tags: [...(params.data.tags ?? [])],
+      createdById: params.data.createdById,
+      updatedById: params.data.updatedById ?? params.data.createdById,
+      currentVersionId: params.data.currentVersionId ?? null,
+      publishedAt: params.data.publishedAt ?? null,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+    state.projectDocuments.push(document);
+    logOperation('projectDocument', 'create', { id: document.id, projectId: document.projectId });
+    return { ...document, tags: [...document.tags] };
+  }
+
+  async update(params: {
+    where: { id: number };
+    data: Partial<
+      Pick<
+        ProjectDocument,
+        'title' | 'description' | 'category' | 'status' | 'tags' | 'updatedById' | 'currentVersionId' | 'publishedAt'
+      >
+    >;
+  }): Promise<ProjectDocument> {
+    const document = state.projectDocuments.find((item) => item.id === params.where.id);
+    if (!document) {
+      throw new Error('Project document not found');
+    }
+    if (params.data.title !== undefined) {
+      document.title = params.data.title;
+    }
+    if (params.data.description !== undefined) {
+      document.description = params.data.description;
+    }
+    if (params.data.category !== undefined) {
+      document.category = params.data.category;
+    }
+    if (params.data.status !== undefined) {
+      document.status = params.data.status;
+    }
+    if (params.data.tags !== undefined) {
+      document.tags = [...params.data.tags];
+    }
+    if (params.data.updatedById !== undefined) {
+      document.updatedById = params.data.updatedById;
+    }
+    if (params.data.currentVersionId !== undefined) {
+      document.currentVersionId = params.data.currentVersionId;
+    }
+    if (params.data.publishedAt !== undefined) {
+      document.publishedAt = params.data.publishedAt;
+    }
+    document.updatedAt = now();
+    logOperation('projectDocument', 'update', { id: document.id });
+    return { ...document, tags: [...document.tags] };
+  }
+}
+
+class ProjectDocumentVersionModel {
+  async findMany(params: { where: { documentId: number } }): Promise<ProjectDocumentVersion[]> {
+    return state.projectDocumentVersions
+      .filter((version) => version.documentId === params.where.documentId)
+      .map((version) => ({ ...version }));
+  }
+
+  async findUnique(params: { where: { id: number } }): Promise<ProjectDocumentVersion | null> {
+    const version = state.projectDocumentVersions.find((item) => item.id === params.where.id);
+    return version ? { ...version } : null;
+  }
+
+  async create(params: {
+    data: {
+      documentId: number;
+      fileName: string;
+      content: string;
+      checksum: string;
+      note?: string | null;
+      createdById: number;
+    };
+  }): Promise<ProjectDocumentVersion> {
+    const timestamp = now();
+    const existingVersions = state.projectDocumentVersions.filter(
+      (version) => version.documentId === params.data.documentId
+    );
+    const nextVersionNumber = existingVersions.reduce((max, version) => Math.max(max, version.version), 0) + 1;
+    const version: ProjectDocumentVersion = {
+      id: nextId('projectDocumentVersions'),
+      documentId: params.data.documentId,
+      version: nextVersionNumber,
+      fileName: params.data.fileName,
+      content: params.data.content,
+      checksum: params.data.checksum,
+      note: params.data.note ?? null,
+      createdById: params.data.createdById,
+      createdAt: timestamp,
+    };
+    state.projectDocumentVersions.push(version);
+    logOperation('projectDocumentVersion', 'create', {
+      id: version.id,
+      documentId: version.documentId,
+      version: version.version,
+    });
+    return { ...version };
+  }
+}
+
 class AuditLogModel {
   async create(params: { data: { userId: number | null; action: string; metadata?: Record<string, unknown> | null } }): Promise<AuditLog> {
     const logEntry: AuditLog = {
@@ -1457,6 +1635,8 @@ export class PrismaClient {
   approval = new ApprovalModel();
   initiative = new InitiativeModel();
   initiativeAssignment = new InitiativeAssignmentModel();
+  projectDocument = new ProjectDocumentModel();
+  projectDocumentVersion = new ProjectDocumentVersionModel();
 
   async $transaction<T>(callback: (tx: PrismaClient) => Promise<T>): Promise<T> {
     return callback(this);
