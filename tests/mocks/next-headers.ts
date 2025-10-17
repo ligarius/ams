@@ -9,30 +9,44 @@ interface CookieSetOptions {
   secure?: boolean;
   maxAge?: number;
   path?: string;
+  domain?: string;
+  priority?: 'low' | 'medium' | 'high';
+  expires?: Date;
 }
 
-type CookieSetInput = CookieValue & CookieSetOptions;
+type CookieStoreEntry = CookieValue & CookieSetOptions;
+type CookieSetInput = CookieStoreEntry;
 
-const cookieStore: CookieValue[] = [];
+const cookieStore: CookieStoreEntry[] = [];
 
-const clone = ({ name, value }: CookieValue): CookieValue => ({ name, value });
+const clone = ({ expires, ...rest }: CookieStoreEntry): CookieStoreEntry => ({
+  ...rest,
+  ...(expires ? { expires: new Date(expires) } : {}),
+});
+
+const prepareForStore = ({ expires, ...rest }: CookieStoreEntry): CookieStoreEntry => ({
+  ...rest,
+  ...(expires ? { expires: new Date(expires) } : {}),
+});
 
 const findCookieIndex = (name: string) => cookieStore.findIndex((cookie) => cookie.name === name);
 
 const normaliseSetInput = (
   nameOrOptions: string | CookieSetInput,
   value?: string,
-  _options?: CookieSetOptions
-): CookieValue => {
+  options?: CookieSetOptions
+): CookieStoreEntry => {
   if (typeof nameOrOptions === 'string') {
     if (typeof value !== 'string') {
       throw new TypeError('cookies().set requires a string value when called with a name');
     }
 
-    return { name: nameOrOptions, value };
+    return { name: nameOrOptions, value, ...(options ?? {}) };
   }
 
-  return { name: nameOrOptions.name, value: nameOrOptions.value };
+  const { name, value: resolvedValue, ...setOptions } = nameOrOptions;
+
+  return { name, value: resolvedValue, ...setOptions };
 };
 
 export const headers = jest.fn(() => ({
@@ -51,14 +65,14 @@ export const cookies = jest.fn(() => {
     value?: string,
     options?: CookieSetOptions
   ) => {
-    const { name, value: resolvedValue } = normaliseSetInput(nameOrOptions, value, options);
-    const index = findCookieIndex(name);
-    const newEntry = { name, value: resolvedValue };
+    const normalised = normaliseSetInput(nameOrOptions, value, options);
+    const index = findCookieIndex(normalised.name);
+    const entry = prepareForStore(normalised);
     if (index === -1) {
-      cookieStore.push(newEntry);
+      cookieStore.push(entry);
       return;
     }
-    cookieStore[index] = newEntry;
+    cookieStore[index] = entry;
   };
   const remove = (name: string) => {
     const index = findCookieIndex(name);
@@ -67,12 +81,14 @@ export const cookies = jest.fn(() => {
     }
     cookieStore.splice(index, 1);
   };
+  const has = (name: string) => findCookieIndex(name) !== -1;
 
   return {
     getAll,
     get,
     set,
     delete: remove,
+    has,
   };
 });
 

@@ -16,15 +16,21 @@ declare module 'next/headers' {
     secure?: boolean;
     maxAge?: number;
     path?: string;
+    domain?: string;
+    priority?: 'low' | 'medium' | 'high';
+    expires?: Date;
   }
 
+  type RequestCookie = CookieValue & CookieSetOptions;
+
   interface RequestCookies {
-    getAll(): CookieValue[];
-    getAll(name: string): CookieValue[];
-    get(name: string): CookieValue | undefined;
+    getAll(): RequestCookie[];
+    getAll(name: string): RequestCookie[];
+    get(name: string): RequestCookie | undefined;
     set(name: string, value: string, options?: CookieSetOptions): void;
-    set(options: CookieValue & CookieSetOptions): void;
+    set(options: RequestCookie): void;
     delete(name: string): void;
+    has(name: string): boolean;
   }
 
   export function headers(): ReadonlyHeaders;
