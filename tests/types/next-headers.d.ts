@@ -11,22 +11,36 @@ declare module 'next/headers' {
   }
 
   interface CookieSetOptions {
-    name: string;
-    value: string;
     httpOnly?: boolean;
     sameSite?: SameSiteOption;
     secure?: boolean;
     maxAge?: number;
     path?: string;
+    domain?: string;
+    priority?: 'low' | 'medium' | 'high';
+    expires?: Date;
+  }
+
+  type RequestCookie = CookieValue & CookieSetOptions;
+
+  interface CookieDeleteOptions {
+    name: string;
+    path?: string;
+    domain?: string;
   }
 
   interface RequestCookies {
-    getAll(): CookieValue[];
-    get(name: string): CookieValue | undefined;
-    set(options: CookieSetOptions): void;
+    getAll(): RequestCookie[];
+    getAll(name: string): RequestCookie[];
+    get(name: string): RequestCookie | undefined;
+    set(name: string, value: string, options?: CookieSetOptions): void;
+    set(options: RequestCookie): void;
     delete(name: string): void;
+    delete(options: CookieDeleteOptions): void;
+    has(name: string): boolean;
   }
 
   export function headers(): ReadonlyHeaders;
   export function cookies(): RequestCookies;
+  export function __resetCookiesStore(): void;
 }
