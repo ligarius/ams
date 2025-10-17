@@ -3,7 +3,7 @@ interface CookieValue {
   value: string;
 }
 
-interface CookieSetOptions extends CookieValue {
+interface CookieSetOptions {
   httpOnly?: boolean;
   sameSite?: 'lax' | 'strict' | 'none';
   secure?: boolean;
@@ -11,25 +11,49 @@ interface CookieSetOptions extends CookieValue {
   path?: string;
 }
 
+type CookieSetInput = CookieValue & CookieSetOptions;
+
 const cookieStore: CookieValue[] = [];
 
 const clone = ({ name, value }: CookieValue): CookieValue => ({ name, value });
 
 const findCookieIndex = (name: string) => cookieStore.findIndex((cookie) => cookie.name === name);
 
+const normaliseSetInput = (
+  nameOrOptions: string | CookieSetInput,
+  value?: string,
+  _options?: CookieSetOptions
+): CookieValue => {
+  if (typeof nameOrOptions === 'string') {
+    if (typeof value !== 'string') {
+      throw new TypeError('cookies().set requires a string value when called with a name');
+    }
+
+    return { name: nameOrOptions, value };
+  }
+
+  return { name: nameOrOptions.name, value: nameOrOptions.value };
+};
+
 export const headers = jest.fn(() => ({
   get: () => null,
 }));
 
 export const cookies = jest.fn(() => {
-  const getAll = () => cookieStore.map(clone);
+  const getAll = (name?: string) =>
+    cookieStore.filter((cookie) => (name ? cookie.name === name : true)).map(clone);
   const get = (name: string) => {
     const entry = cookieStore.find((cookie) => cookie.name === name);
     return entry ? clone(entry) : undefined;
   };
-  const set = ({ name, value }: CookieSetOptions) => {
+  const set = (
+    nameOrOptions: string | CookieSetInput,
+    value?: string,
+    options?: CookieSetOptions
+  ) => {
+    const { name, value: resolvedValue } = normaliseSetInput(nameOrOptions, value, options);
     const index = findCookieIndex(name);
-    const newEntry = { name, value };
+    const newEntry = { name, value: resolvedValue };
     if (index === -1) {
       cookieStore.push(newEntry);
       return;
