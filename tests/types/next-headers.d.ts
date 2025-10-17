@@ -11,8 +11,6 @@ declare module 'next/headers' {
   }
 
   interface CookieSetOptions {
-    name: string;
-    value: string;
     httpOnly?: boolean;
     sameSite?: SameSiteOption;
     secure?: boolean;
@@ -22,11 +20,14 @@ declare module 'next/headers' {
 
   interface RequestCookies {
     getAll(): CookieValue[];
+    getAll(name: string): CookieValue[];
     get(name: string): CookieValue | undefined;
-    set(options: CookieSetOptions): void;
+    set(name: string, value: string, options?: CookieSetOptions): void;
+    set(options: CookieValue & CookieSetOptions): void;
     delete(name: string): void;
   }
 
   export function headers(): ReadonlyHeaders;
   export function cookies(): RequestCookies;
+  export function __resetCookiesStore(): void;
 }
