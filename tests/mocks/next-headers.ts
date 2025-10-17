@@ -37,14 +37,30 @@ const prepareForStore = ({ expires, ...rest }: CookieStoreEntry): CookieStoreEnt
 
 const matchesIdentity = (
   entry: CookieStoreEntry,
-  identity: CookieDeleteOptions
-) =>
-  entry.name === identity.name &&
-  (identity.path === undefined || entry.path === identity.path) &&
-  (identity.domain === undefined || entry.domain === identity.domain);
+  identity: CookieDeleteOptions,
+  exact: boolean
+) => {
+  if (entry.name !== identity.name) {
+    return false;
+  }
 
-const findCookieIndex = (identity: CookieDeleteOptions) =>
-  cookieStore.findIndex((cookie) => matchesIdentity(cookie, identity));
+  if (exact) {
+    return entry.path === identity.path && entry.domain === identity.domain;
+  }
+
+  if (identity.path !== undefined && entry.path !== identity.path) {
+    return false;
+  }
+
+  if (identity.domain !== undefined && entry.domain !== identity.domain) {
+    return false;
+  }
+
+  return true;
+};
+
+const findCookieIndex = (identity: CookieDeleteOptions, exact: boolean) =>
+  cookieStore.findIndex((cookie) => matchesIdentity(cookie, identity, exact));
 
 const resolveIdentity = (input: string | CookieDeleteOptions): CookieDeleteOptions =>
   typeof input === 'string' ? { name: input } : input;
@@ -86,7 +102,7 @@ export const cookies = jest.fn(() => {
     const normalised = normaliseSetInput(nameOrOptions, value, options);
     const identity = resolveIdentity(normalised);
     const entry = prepareForStore(normalised);
-    const index = findCookieIndex(identity);
+    const index = findCookieIndex(identity, true);
     if (index === -1) {
       cookieStore.push(entry);
       return;
@@ -95,7 +111,7 @@ export const cookies = jest.fn(() => {
   };
   const remove = (nameOrOptions: string | CookieDeleteOptions) => {
     const identity = resolveIdentity(nameOrOptions);
-    const index = findCookieIndex(identity);
+    const index = findCookieIndex(identity, typeof nameOrOptions !== 'string');
     if (index === -1) {
       return;
     }

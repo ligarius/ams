@@ -62,6 +62,18 @@ describe('tests/mocks/next-headers', () => {
     expect(jar.getAll('scoped').map((cookie) => cookie.domain)).toEqual(['tenant.local']);
   });
 
+  it('retains scoped cookies when adding a default scoped cookie later', () => {
+    const jar = cookies();
+
+    jar.set({ name: 'flavour', value: 'chocolate', path: '/account' });
+    jar.set({ name: 'flavour', value: 'vanilla' });
+
+    const all = jar.getAll('flavour');
+    expect(all).toHaveLength(2);
+    expect(all.find((cookie) => cookie.path === '/account')?.value).toBe('chocolate');
+    expect(all.find((cookie) => cookie.path === undefined)?.value).toBe('vanilla');
+  });
+
   it('keeps the shared store mutable across getAll results', () => {
     const jar = cookies();
 
