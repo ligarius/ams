@@ -313,8 +313,13 @@ export default async function ProjectOverviewPage({ params }: PageProps) {
       <Grid container spacing={3}>
         <Grid item xs={12} md={4}>
           <Paper variant="outlined" sx={{ p: 3, height: '100%' }}>
-            <Stack spacing={2} height="100%">
-              <Stack direction="row" alignItems="center" spacing={1.5} justifyContent="space-between">
+            <Stack spacing={2.5} height="100%">
+              <Stack
+                direction={{ xs: 'column', sm: 'row' }}
+                alignItems={{ xs: 'flex-start', sm: 'center' }}
+                spacing={1.5}
+                justifyContent="space-between"
+              >
                 <Stack direction="row" spacing={1.5} alignItems="center">
                   <DescriptionIcon color="primary" />
                   <Stack spacing={0.25}>
@@ -340,20 +345,26 @@ export default async function ProjectOverviewPage({ params }: PageProps) {
                   ? `Próxima entrega: ${dateFormatter.format(new Date(overview.dataRequests.nextDue))}`
                   : 'Aún no hay próximas entregas planificadas.'}
               </Typography>
-              <Stack direction="row" spacing={1} flexWrap useFlexGap>
+              <Grid container spacing={1.5} columns={{ xs: 12, sm: 24 }}>
                 {(Object.keys(dataRequestStatusLabels) as Array<DataRequestStatus>).map((status) => {
                   const config = dataRequestStatusLabels[status];
                   return (
-                    <Chip
-                      key={status}
-                      size="small"
-                      color={config.color}
-                      variant="outlined"
-                      label={`${config.label}: ${overview.dataRequests.byStatus[status]}`}
-                    />
+                    <Grid item xs={12} sm={12} md={8} key={status}>
+                      <Stack spacing={0.5}>
+                        <Typography variant="caption" color="text.secondary">
+                          {config.label}
+                        </Typography>
+                        <Chip
+                          size="small"
+                          color={config.color}
+                          variant="outlined"
+                          label={`${overview.dataRequests.byStatus[status]} registros`}
+                        />
+                      </Stack>
+                    </Grid>
                   );
                 })}
-              </Stack>
+              </Grid>
             </Stack>
           </Paper>
         </Grid>
@@ -573,48 +584,7 @@ export default async function ProjectOverviewPage({ params }: PageProps) {
       </Paper>
 
       <Grid container spacing={3}>
-        <Grid item xs={12} lg={6}>
-          <Paper variant="outlined" sx={{ p: 3.5, height: '100%' }}>
-            <Stack spacing={3} height="100%">
-              <Typography variant="h6">Checklist pendientes</Typography>
-              {overview.pendingChecklists.length === 0 ? (
-                <Typography variant="body2" color="text.secondary">
-                  ¡Buen trabajo! No hay checklist pendientes. Cualquier nueva tarea que se programe aparecerá aquí ordenada por
-                  fecha de vencimiento.
-                </Typography>
-              ) : (
-                <List disablePadding>
-                  {overview.pendingChecklists.map((item, index) => {
-                    const parsed = parseChecklistName(item.name);
-                    return (
-                      <Fragment key={item.id}>
-                        {index > 0 && <Divider component="li" sx={{ my: 1.5 }} />}
-                        <ListItem alignItems="flex-start" disableGutters sx={{ py: 1.5 }}>
-                          <Stack spacing={1} sx={{ flexGrow: 1, pr: 2 }}>
-                            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-                              <Typography variant="body2" fontWeight={600} component="span">
-                                {parsed.label}
-                              </Typography>
-                              {parsed.framework && (
-                                <Chip label={parsed.framework} size="small" variant="outlined" color="primary" />
-                              )}
-                            </Stack>
-                            <Typography variant="caption" color="text.secondary">
-                              {formatChecklistDueDate(item.dueDate)}
-                            </Typography>
-                          </Stack>
-                          <Chip label={checklistStatusLabel[item.status]} size="small" color="warning" variant="outlined" />
-                        </ListItem>
-                      </Fragment>
-                    );
-                  })}
-                </List>
-              )}
-            </Stack>
-          </Paper>
-        </Grid>
-
-        <Grid item xs={12} lg={6}>
+        <Grid item xs={12}>
           <Paper variant="outlined" sx={{ p: 3.5, height: '100%' }}>
             <Stack spacing={3} height="100%">
               <Typography variant="h6">Riesgos prioritarios</Typography>
@@ -624,7 +594,7 @@ export default async function ProjectOverviewPage({ params }: PageProps) {
                   agreguen nuevos riesgos, verás los más críticos junto a su puntaje combinado.
                 </Typography>
               ) : (
-                <Stack spacing={2.5} divider={<Divider flexItem />}>
+                <Stack spacing={3} divider={<Divider flexItem />}>
                   {topPrioritized.map((risk) => {
                     const status = riskStatusConfig[risk.status];
                     const severity = severityConfig[risk.severity];
@@ -632,22 +602,59 @@ export default async function ProjectOverviewPage({ params }: PageProps) {
                     const complexity = complexityConfig[risk.complexity];
                     const likelihood = likelihoodConfig[risk.likelihood];
                     return (
-                      <Stack key={risk.id} spacing={1.5}>
-                        <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={1}>
+                      <Stack key={risk.id} spacing={2}>
+                        <Stack
+                          direction={{ xs: 'column', sm: 'row' }}
+                          justifyContent="space-between"
+                          alignItems={{ xs: 'flex-start', sm: 'center' }}
+                          spacing={1.5}
+                        >
                           <Typography variant="subtitle1" fontWeight={600} sx={{ wordBreak: 'break-word' }}>
                             {risk.title}
                           </Typography>
-                          <Stack direction="row" spacing={0.5} alignItems="center">
-                            <Chip size="small" color="primary" label={`Puntaje ${scoreFormatter.format(risk.score)}`} />
+                          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={0.75} alignItems={{ sm: 'center' }}>
+                            <Chip
+                              size="small"
+                              color="primary"
+                              label={`Puntaje ${scoreFormatter.format(risk.score)}`}
+                            />
                             <Chip size="small" color={status.color} label={status.label} />
                           </Stack>
                         </Stack>
-                        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                          <Chip size="small" variant="outlined" color={severity.color} label={severity.label} />
-                          <Chip size="small" variant="outlined" color={likelihood.color} label={likelihood.label} />
-                          <Chip size="small" variant="outlined" color={urgency.color} label={urgency.label} />
-                          <Chip size="small" variant="outlined" color={complexity.color} label={complexity.label} />
-                        </Stack>
+                        <Grid container spacing={1.5} columns={{ xs: 12, sm: 24 }}>
+                          <Grid item xs={12} sm={12} md={6}>
+                            <Stack spacing={0.5}>
+                              <Typography variant="caption" color="text.secondary">
+                                Impacto
+                              </Typography>
+                              <Chip size="small" variant="outlined" color={severity.color} label={severity.label} />
+                            </Stack>
+                          </Grid>
+                          <Grid item xs={12} sm={12} md={6}>
+                            <Stack spacing={0.5}>
+                              <Typography variant="caption" color="text.secondary">
+                                Probabilidad
+                              </Typography>
+                              <Chip size="small" variant="outlined" color={likelihood.color} label={likelihood.label} />
+                            </Stack>
+                          </Grid>
+                          <Grid item xs={12} sm={12} md={6}>
+                            <Stack spacing={0.5}>
+                              <Typography variant="caption" color="text.secondary">
+                                Urgencia
+                              </Typography>
+                              <Chip size="small" variant="outlined" color={urgency.color} label={urgency.label} />
+                            </Stack>
+                          </Grid>
+                          <Grid item xs={12} sm={12} md={6}>
+                            <Stack spacing={0.5}>
+                              <Typography variant="caption" color="text.secondary">
+                                Complejidad
+                              </Typography>
+                              <Chip size="small" variant="outlined" color={complexity.color} label={complexity.label} />
+                            </Stack>
+                          </Grid>
+                        </Grid>
                       </Stack>
                     );
                   })}
@@ -666,9 +673,9 @@ export default async function ProjectOverviewPage({ params }: PageProps) {
                   <Box
                     sx={{
                       display: 'grid',
-                      gridTemplateColumns: 'repeat(4, minmax(140px, 1fr))',
+                      gridTemplateColumns: { xs: 'repeat(4, minmax(180px, 1fr))', md: 'repeat(4, minmax(160px, 1fr))' },
                       gap: 1,
-                      minWidth: 560,
+                      minWidth: { xs: 720, md: 640 },
                     }}
                   >
                     <Box sx={{ p: 1 }} />
@@ -771,6 +778,47 @@ export default async function ProjectOverviewPage({ params }: PageProps) {
                   </Box>
                 </Box>
               </Stack>
+            </Stack>
+          </Paper>
+        </Grid>
+
+        <Grid item xs={12}>
+          <Paper variant="outlined" sx={{ p: 3.5, height: '100%' }}>
+            <Stack spacing={3} height="100%">
+              <Typography variant="h6">Checklist pendientes</Typography>
+              {overview.pendingChecklists.length === 0 ? (
+                <Typography variant="body2" color="text.secondary">
+                  ¡Buen trabajo! No hay checklist pendientes. Cualquier nueva tarea que se programe aparecerá aquí ordenada por
+                  fecha de vencimiento.
+                </Typography>
+              ) : (
+                <List disablePadding>
+                  {overview.pendingChecklists.map((item, index) => {
+                    const parsed = parseChecklistName(item.name);
+                    return (
+                      <Fragment key={item.id}>
+                        {index > 0 && <Divider component="li" sx={{ my: 1.5 }} />}
+                        <ListItem alignItems="flex-start" disableGutters sx={{ py: 1.5 }}>
+                          <Stack spacing={1} sx={{ flexGrow: 1, pr: 2 }}>
+                            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                              <Typography variant="body2" fontWeight={600} component="span">
+                                {parsed.label}
+                              </Typography>
+                              {parsed.framework && (
+                                <Chip label={parsed.framework} size="small" variant="outlined" color="primary" />
+                              )}
+                            </Stack>
+                            <Typography variant="caption" color="text.secondary">
+                              {formatChecklistDueDate(item.dueDate)}
+                            </Typography>
+                          </Stack>
+                          <Chip label={checklistStatusLabel[item.status]} size="small" color="warning" variant="outlined" />
+                        </ListItem>
+                      </Fragment>
+                    );
+                  })}
+                </List>
+              )}
             </Stack>
           </Paper>
         </Grid>
