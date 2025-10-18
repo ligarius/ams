@@ -44,6 +44,11 @@ import {
   updateBillingScheduleItem,
 } from '@/services/financialService';
 import { generateProjectRecommendations } from '@/services/recommendationService';
+import {
+  generateBenchmarkReport,
+  listBenchmarkSnapshots,
+  recordBenchmarkFeedback,
+} from '@/services/benchmarkService';
 
 const router = Router();
 
@@ -134,6 +139,84 @@ router.get('/:id/recommendations', async (req: AuthenticatedRequest, res) => {
       }
       if (error.message === 'Insufficient permissions') {
         return res.status(403).json({ message: error.message });
+      }
+      return res.status(400).json({ message: error.message });
+    }
+    return res.status(500).json({ message: 'Unexpected error' });
+  }
+});
+
+router.get('/:id/benchmark', async (req: AuthenticatedRequest, res) => {
+  try {
+    const projectId = Number(req.params.id);
+    if (Number.isNaN(projectId)) {
+      return res.status(400).json({ message: 'Invalid project id' });
+    }
+    const report = await generateBenchmarkReport(projectId, req.user!);
+    return res.json(report);
+  } catch (error) {
+    if (error instanceof Error) {
+      if (error.message === 'Project not found') {
+        return res.status(404).json({ message: error.message });
+      }
+      if (error.message === 'Insufficient permissions') {
+        return res.status(403).json({ message: error.message });
+      }
+      return res.status(400).json({ message: error.message });
+    }
+    return res.status(500).json({ message: 'Unexpected error' });
+  }
+});
+
+router.get('/:id/benchmark/snapshots', async (req: AuthenticatedRequest, res) => {
+  try {
+    const projectId = Number(req.params.id);
+    if (Number.isNaN(projectId)) {
+      return res.status(400).json({ message: 'Invalid project id' });
+    }
+    const limit = req.query.limit ? Number(req.query.limit) : undefined;
+    if (limit !== undefined && Number.isNaN(limit)) {
+      return res.status(400).json({ message: 'Invalid limit parameter' });
+    }
+    const snapshots = await listBenchmarkSnapshots(projectId, req.user!, { limit });
+    return res.json(
+      snapshots.map((snapshot) => ({
+        ...snapshot,
+        generatedAt: snapshot.generatedAt.toISOString(),
+      }))
+    );
+  } catch (error) {
+    if (error instanceof Error) {
+      if (error.message === 'Project not found') {
+        return res.status(404).json({ message: error.message });
+      }
+      if (error.message === 'Insufficient permissions') {
+        return res.status(403).json({ message: error.message });
+      }
+      return res.status(400).json({ message: error.message });
+    }
+    return res.status(500).json({ message: 'Unexpected error' });
+  }
+});
+
+router.post('/:id/benchmark/feedback', async (req: AuthenticatedRequest, res) => {
+  try {
+    const projectId = Number(req.params.id);
+    if (Number.isNaN(projectId)) {
+      return res.status(400).json({ message: 'Invalid project id' });
+    }
+    const feedback = await recordBenchmarkFeedback(projectId, req.body, req.user!);
+    return res.status(201).json({ ...feedback, submittedAt: feedback.submittedAt.toISOString() });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ message: 'Invalid payload', issues: error.flatten() });
+    }
+    if (error instanceof Error) {
+      if (error.message === 'Insufficient permissions') {
+        return res.status(403).json({ message: error.message });
+      }
+      if (error.message === 'Project not found') {
+        return res.status(404).json({ message: error.message });
       }
       return res.status(400).json({ message: error.message });
     }

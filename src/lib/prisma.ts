@@ -429,6 +429,33 @@ export interface BiDataset {
   createdAt: Date;
 }
 
+export interface BenchmarkInsightRecord {
+  id: string;
+  title: string;
+  description: string;
+  impact: number;
+  tags: string[];
+}
+
+export interface BenchmarkSnapshot {
+  id: number;
+  projectId: number;
+  generatedAt: Date;
+  metrics: Record<string, unknown>;
+  comparisons: Record<string, unknown>;
+  insights: BenchmarkInsightRecord[];
+}
+
+export interface BenchmarkFeedback {
+  id: number;
+  projectId: number;
+  userId: number;
+  usefulness: number;
+  confidence: number;
+  comment: string | null;
+  submittedAt: Date;
+}
+
 interface DatabaseState {
   tenants: Tenant[];
   tenantAreas: TenantArea[];
@@ -462,6 +489,8 @@ interface DatabaseState {
   integrationConnectors: IntegrationConnector[];
   connectorSyncRuns: ConnectorSyncRun[];
   biDatasets: BiDataset[];
+  benchmarkSnapshots: BenchmarkSnapshot[];
+  benchmarkFeedback: BenchmarkFeedback[];
   sequences: Record<string, number>;
 }
 
@@ -498,6 +527,8 @@ const createEmptyState = (): DatabaseState => ({
   integrationConnectors: [],
   connectorSyncRuns: [],
   biDatasets: [],
+  benchmarkSnapshots: [],
+  benchmarkFeedback: [],
   sequences: {},
 });
 
@@ -2667,6 +2698,83 @@ class BiDatasetModel {
   }
 }
 
+class BenchmarkSnapshotModel {
+  async findMany(params: {
+    where: { projectId: number };
+    orderBy?: { generatedAt: 'asc' | 'desc' };
+    take?: number;
+  }): Promise<BenchmarkSnapshot[]> {
+    const { where, orderBy, take } = params;
+    let entries = state.benchmarkSnapshots.filter((snapshot) => snapshot.projectId === where.projectId);
+    if (orderBy?.generatedAt === 'desc') {
+      entries = entries.sort((a, b) => b.generatedAt.getTime() - a.generatedAt.getTime());
+    } else if (orderBy?.generatedAt === 'asc') {
+      entries = entries.sort((a, b) => a.generatedAt.getTime() - b.generatedAt.getTime());
+    }
+    if (take !== undefined) {
+      entries = entries.slice(0, take);
+    }
+    return entries.map((entry) => ({
+      ...entry,
+      metrics: { ...entry.metrics },
+      comparisons: { ...entry.comparisons },
+      insights: entry.insights.map((insight) => ({ ...insight, tags: [...insight.tags] })),
+    }));
+  }
+
+  async create(params: {
+    data: {
+      projectId: number;
+      generatedAt?: Date;
+      metrics: Record<string, unknown>;
+      comparisons: Record<string, unknown>;
+      insights: BenchmarkInsightRecord[];
+    };
+  }): Promise<BenchmarkSnapshot> {
+    const snapshot: BenchmarkSnapshot = {
+      id: nextId('benchmarkSnapshots'),
+      projectId: params.data.projectId,
+      generatedAt: params.data.generatedAt ?? now(),
+      metrics: { ...params.data.metrics },
+      comparisons: { ...params.data.comparisons },
+      insights: params.data.insights.map((insight) => ({ ...insight, tags: [...insight.tags] })),
+    };
+    state.benchmarkSnapshots.push(snapshot);
+    logOperation('benchmarkSnapshot', 'create', { id: snapshot.id, projectId: snapshot.projectId });
+    return {
+      ...snapshot,
+      metrics: { ...snapshot.metrics },
+      comparisons: { ...snapshot.comparisons },
+      insights: snapshot.insights.map((insight) => ({ ...insight, tags: [...insight.tags] })),
+    };
+  }
+}
+
+class BenchmarkFeedbackModel {
+  async findMany(params: { where: { projectId: number } }): Promise<BenchmarkFeedback[]> {
+    return state.benchmarkFeedback
+      .filter((feedback) => feedback.projectId === params.where.projectId)
+      .map((feedback) => ({ ...feedback }));
+  }
+
+  async create(params: {
+    data: { projectId: number; userId: number; usefulness: number; confidence: number; comment?: string | null };
+  }): Promise<BenchmarkFeedback> {
+    const entry: BenchmarkFeedback = {
+      id: nextId('benchmarkFeedback'),
+      projectId: params.data.projectId,
+      userId: params.data.userId,
+      usefulness: params.data.usefulness,
+      confidence: params.data.confidence,
+      comment: params.data.comment ?? null,
+      submittedAt: now(),
+    };
+    state.benchmarkFeedback.push(entry);
+    logOperation('benchmarkFeedback', 'create', { id: entry.id, projectId: entry.projectId });
+    return { ...entry };
+  }
+}
+
 class AuditLogModel {
   async create(params: { data: { userId: number | null; action: string; metadata?: Record<string, unknown> | null } }): Promise<AuditLog> {
     const logEntry: AuditLog = {
@@ -2758,6 +2866,8 @@ export class PrismaClient {
   integrationConnector = new IntegrationConnectorModel();
   connectorSyncRun = new ConnectorSyncRunModel();
   biDataset = new BiDatasetModel();
+  benchmarkSnapshot = new BenchmarkSnapshotModel();
+  benchmarkFeedback = new BenchmarkFeedbackModel();
 
   async $transaction<T>(callback: (tx: PrismaClient) => Promise<T>): Promise<T> {
     return callback(this);

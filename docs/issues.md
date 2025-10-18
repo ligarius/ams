@@ -9,6 +9,7 @@ Cada ticket incluye criterios de aceptación (CA) y checklist de QA.
 - ✅ **Sprint 2** fue entregado con el wizard de creación sembrando automáticamente categorías, riesgos, checklists, KPIs y gobernanza para nuevos proyectos, más el overview consolidado protegido por permisos.
 - ✅ **Sprint 3** quedó cerrado con solicitudes de información (archivos incluidos), gestión integral de riesgos/hallazgos y flujos de aprobaciones.
 - ✅ **Sprint 4** se cerró con cobertura consolidada (>81 % líneas/statements), métricas publicadas en CI y reforzamiento de observabilidad (CSP, `/metrics`, rate limiting) listo para compartir con stakeholders.
+- 🚧 **Sprint 9** avanza con benchmarking comparativo, snapshots históricos y feedback estructurado para priorizar mejoras operativas.
 - 🔄 **Mantenimiento dependencias frontend (12-oct-2025)**: se reinstalaron las dependencias declaradas en `apps/web/package.json` (`npm install`) para asegurar que `node_modules` refleje los paquetes esperados tras integrar Material UI.
 
 La tabla siguiente recoge los entregables inmediatos priorizados para Sprint 4 y sirve como acta de cierre.
@@ -190,4 +191,31 @@ Las tres historias del sprint se encuentran en producción y están cubiertas po
 - Integración con repositorio de políticas.
 - Reportes PDF con hallazgos y KPIs.
 - Automatización de recordatorios por email/slack.
+
+## Sprint 9 — Benchmarking y aprendizaje continuo 🚧
+
+### 9.1 Benchmarking integral y healthscore
+- **Historia**: Como líder de programa, quiero comparar el desempeño de mi proyecto con el resto del portafolio para priorizar mejoras.
+- **Tareas**:
+  - Generar un reporte consolidado con métricas de riesgo, solicitudes, hallazgos, reutilización de plantillas, staffing e integraciones.
+  - Persistir snapshots históricos para analizar tendencia y posición porcentual dentro del portafolio.
+  - Producir insights accionables con drivers cuantificados y vínculos a plantillas/iniciativas sugeridas.
+- **CA**:
+  - El endpoint `/api/projects/:id/benchmark` devuelve métricas, comparativos y lista de recomendaciones con `snapshotId` asociado.
+  - Existe historial consultable en `/api/projects/:id/benchmark/snapshots` y se actualiza con cada corrida.
+- **QA**:
+  - Pruebas unitarias de cálculo (`benchmarkService.test.ts`).
+  - Integración valida flujo completo desde la creación de señales hasta la captura de feedback.
+
+### 9.2 Feedback curado de insights
+- **Historia**: Como consultor, quiero calificar la utilidad de los insights para mejorar el motor de recomendaciones.
+- **Tareas**:
+  - API para registrar feedback con puntajes de utilidad/confianza y comentarios opcionales.
+  - Auditoría en `AuditLog` con métricas de satisfacción.
+- **CA**:
+  - `POST /api/projects/:id/benchmark/feedback` acepta payload validado (1-5) y responde con timestamp normalizado.
+  - Auditoría registra `BENCHMARK_FEEDBACK_RECORDED` con `projectId` y puntajes.
+- **QA**:
+  - Validaciones negativas (payload inválido) devuelven 400.
+  - Cobertura automatizada en suite de integración.
 
