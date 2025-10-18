@@ -241,6 +241,64 @@ export interface InitiativeAssignment {
   updatedAt: Date;
 }
 
+export type ConsultantSeniority = 'ASSOCIATE' | 'CONSULTANT' | 'SENIOR' | 'MANAGER' | 'DIRECTOR';
+export type BillingModel = 'MILESTONE' | 'MONTHLY';
+export type BillingStatus = 'PLANNED' | 'INVOICED' | 'PAID';
+
+export interface Consultant {
+  id: number;
+  name: string;
+  email: string;
+  title: string;
+  seniority: ConsultantSeniority;
+  practiceArea: string;
+  skills: string[];
+  costRate: number;
+  billableRate: number;
+  weeklyCapacity: number;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface StaffingAssignment {
+  id: number;
+  consultantId: number;
+  projectId: number;
+  startDate: Date;
+  endDate: Date | null;
+  allocation: number;
+  hoursPerWeek: number;
+  billable: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface ProjectFinancialSettings {
+  id: number;
+  projectId: number;
+  billingModel: BillingModel;
+  currency: CurrencyCode;
+  paymentTerms: string | null;
+  lastUpdatedById: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface BillingScheduleItem {
+  id: number;
+  projectId: number;
+  type: BillingModel;
+  name: string;
+  dueDate: Date;
+  amount: number;
+  currency: CurrencyCode;
+  status: BillingStatus;
+  notes: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export type DocumentCategory = 'EVIDENCE' | 'DELIVERABLE' | 'POLICY' | 'PROCEDURE';
 export type DocumentStatus = 'DRAFT' | 'IN_REVIEW' | 'APPROVED' | 'PUBLISHED';
 
@@ -293,6 +351,10 @@ interface DatabaseState {
   approvals: Approval[];
   initiatives: Initiative[];
   initiativeAssignments: InitiativeAssignment[];
+  consultants: Consultant[];
+  staffingAssignments: StaffingAssignment[];
+  projectFinancialSettings: ProjectFinancialSettings[];
+  billingScheduleItems: BillingScheduleItem[];
   projectDocuments: ProjectDocument[];
   projectDocumentVersions: ProjectDocumentVersion[];
   sequences: Record<string, number>;
@@ -319,6 +381,10 @@ const createEmptyState = (): DatabaseState => ({
   approvals: [],
   initiatives: [],
   initiativeAssignments: [],
+  consultants: [],
+  staffingAssignments: [],
+  projectFinancialSettings: [],
+  billingScheduleItems: [],
   projectDocuments: [],
   projectDocumentVersions: [],
   sequences: {},
@@ -1413,6 +1479,332 @@ class InitiativeAssignmentModel {
   }
 }
 
+class ConsultantModel {
+  async findMany(): Promise<Consultant[]> {
+    return state.consultants.map((consultant) => ({ ...consultant, skills: [...consultant.skills] }));
+  }
+
+  async findUnique(params: { where: { id?: number; email?: string } }): Promise<Consultant | null> {
+    const { id, email } = params.where;
+    const consultant = state.consultants.find((item) => {
+      if (id !== undefined) {
+        return item.id === id;
+      }
+      if (email !== undefined) {
+        return item.email.toLowerCase() === email.toLowerCase();
+      }
+      return false;
+    });
+    return consultant ? { ...consultant, skills: [...consultant.skills] } : null;
+  }
+
+  async create(params: {
+    data: {
+      name: string;
+      email: string;
+      title: string;
+      seniority: ConsultantSeniority;
+      practiceArea: string;
+      skills?: string[];
+      costRate: number;
+      billableRate: number;
+      weeklyCapacity: number;
+      isActive?: boolean;
+    };
+  }): Promise<Consultant> {
+    if (state.consultants.some((consultant) => consultant.email.toLowerCase() === params.data.email.toLowerCase())) {
+      throw new Error('Consultant email already exists');
+    }
+    const timestamp = now();
+    const consultant: Consultant = {
+      id: nextId('consultants'),
+      name: params.data.name,
+      email: params.data.email,
+      title: params.data.title,
+      seniority: params.data.seniority,
+      practiceArea: params.data.practiceArea,
+      skills: params.data.skills ? [...params.data.skills] : [],
+      costRate: params.data.costRate,
+      billableRate: params.data.billableRate,
+      weeklyCapacity: params.data.weeklyCapacity,
+      isActive: params.data.isActive ?? true,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+    state.consultants.push(consultant);
+    logOperation('consultant', 'create', { id: consultant.id, email: consultant.email });
+    return { ...consultant, skills: [...consultant.skills] };
+  }
+
+  async update(params: {
+    where: { id: number };
+    data: Partial<
+      Pick<
+        Consultant,
+        'name' | 'email' | 'title' | 'seniority' | 'practiceArea' | 'skills' | 'costRate' | 'billableRate' | 'weeklyCapacity' | 'isActive'
+      >
+    >;
+  }): Promise<Consultant> {
+    const consultant = state.consultants.find((item) => item.id === params.where.id);
+    if (!consultant) {
+      throw new Error('Consultant not found');
+    }
+    if (params.data.email !== undefined && params.data.email.toLowerCase() !== consultant.email.toLowerCase()) {
+      if (state.consultants.some((other) => other.id !== consultant.id && other.email.toLowerCase() === params.data.email!.toLowerCase())) {
+        throw new Error('Consultant email already exists');
+      }
+      consultant.email = params.data.email;
+    }
+    if (params.data.name !== undefined) {
+      consultant.name = params.data.name;
+    }
+    if (params.data.title !== undefined) {
+      consultant.title = params.data.title;
+    }
+    if (params.data.seniority !== undefined) {
+      consultant.seniority = params.data.seniority;
+    }
+    if (params.data.practiceArea !== undefined) {
+      consultant.practiceArea = params.data.practiceArea;
+    }
+    if (params.data.skills !== undefined) {
+      consultant.skills = [...params.data.skills];
+    }
+    if (params.data.costRate !== undefined) {
+      consultant.costRate = params.data.costRate;
+    }
+    if (params.data.billableRate !== undefined) {
+      consultant.billableRate = params.data.billableRate;
+    }
+    if (params.data.weeklyCapacity !== undefined) {
+      consultant.weeklyCapacity = params.data.weeklyCapacity;
+    }
+    if (params.data.isActive !== undefined) {
+      consultant.isActive = params.data.isActive;
+    }
+    consultant.updatedAt = now();
+    logOperation('consultant', 'update', { id: consultant.id });
+    return { ...consultant, skills: [...consultant.skills] };
+  }
+}
+
+class StaffingAssignmentModel {
+  async findMany(params?: {
+    where?: { consultantId?: number; projectId?: number; activeOnly?: boolean };
+  }): Promise<StaffingAssignment[]> {
+    const { consultantId, projectId, activeOnly } = params?.where ?? {};
+    const referenceDate = now();
+    return state.staffingAssignments
+      .filter((assignment) => (consultantId ? assignment.consultantId === consultantId : true))
+      .filter((assignment) => (projectId ? assignment.projectId === projectId : true))
+      .filter((assignment) => {
+        if (!activeOnly) {
+          return true;
+        }
+        return assignment.startDate <= referenceDate && (assignment.endDate === null || assignment.endDate >= referenceDate);
+      })
+      .map((assignment) => ({ ...assignment }));
+  }
+
+  async findUnique(params: { where: { id: number } }): Promise<StaffingAssignment | null> {
+    const assignment = state.staffingAssignments.find((item) => item.id === params.where.id);
+    return assignment ? { ...assignment } : null;
+  }
+
+  async create(params: {
+    data: {
+      consultantId: number;
+      projectId: number;
+      startDate: Date;
+      endDate?: Date | null;
+      allocation: number;
+      hoursPerWeek: number;
+      billable: boolean;
+    };
+  }): Promise<StaffingAssignment> {
+    const { startDate, endDate } = params.data;
+    if (endDate && endDate < startDate) {
+      throw new Error('Assignment end date cannot be before start date');
+    }
+    const timestamp = now();
+    const assignment: StaffingAssignment = {
+      id: nextId('staffingAssignments'),
+      consultantId: params.data.consultantId,
+      projectId: params.data.projectId,
+      startDate,
+      endDate: endDate ?? null,
+      allocation: params.data.allocation,
+      hoursPerWeek: params.data.hoursPerWeek,
+      billable: params.data.billable,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+    state.staffingAssignments.push(assignment);
+    logOperation('staffingAssignment', 'create', {
+      id: assignment.id,
+      projectId: assignment.projectId,
+      consultantId: assignment.consultantId,
+    });
+    return { ...assignment };
+  }
+
+  async update(params: {
+    where: { id: number };
+    data: Partial<Pick<StaffingAssignment, 'startDate' | 'endDate' | 'allocation' | 'hoursPerWeek' | 'billable'>>;
+  }): Promise<StaffingAssignment> {
+    const assignment = state.staffingAssignments.find((item) => item.id === params.where.id);
+    if (!assignment) {
+      throw new Error('Staffing assignment not found');
+    }
+    const nextStart = params.data.startDate ?? assignment.startDate;
+    const nextEnd = params.data.endDate ?? assignment.endDate;
+    if (nextEnd && nextEnd < nextStart) {
+      throw new Error('Assignment end date cannot be before start date');
+    }
+    if (params.data.startDate !== undefined) {
+      assignment.startDate = params.data.startDate;
+    }
+    if (params.data.endDate !== undefined) {
+      assignment.endDate = params.data.endDate;
+    }
+    if (params.data.allocation !== undefined) {
+      assignment.allocation = params.data.allocation;
+    }
+    if (params.data.hoursPerWeek !== undefined) {
+      assignment.hoursPerWeek = params.data.hoursPerWeek;
+    }
+    if (params.data.billable !== undefined) {
+      assignment.billable = params.data.billable;
+    }
+    assignment.updatedAt = now();
+    logOperation('staffingAssignment', 'update', { id: assignment.id });
+    return { ...assignment };
+  }
+}
+
+class ProjectFinancialSettingsModel {
+  async findUnique(params: { where: { projectId: number } }): Promise<ProjectFinancialSettings | null> {
+    const entry = state.projectFinancialSettings.find((item) => item.projectId === params.where.projectId);
+    return entry ? { ...entry } : null;
+  }
+
+  async upsert(params: {
+    where: { projectId: number };
+    create: { billingModel: BillingModel; currency: CurrencyCode; paymentTerms?: string | null; lastUpdatedById: number };
+    update: { billingModel?: BillingModel; currency?: CurrencyCode; paymentTerms?: string | null; lastUpdatedById: number };
+  }): Promise<ProjectFinancialSettings> {
+    const existing = state.projectFinancialSettings.find((item) => item.projectId === params.where.projectId);
+    const timestamp = now();
+    if (!existing) {
+      const created: ProjectFinancialSettings = {
+        id: nextId('projectFinancialSettings'),
+        projectId: params.where.projectId,
+        billingModel: params.create.billingModel,
+        currency: params.create.currency,
+        paymentTerms: params.create.paymentTerms ?? null,
+        lastUpdatedById: params.create.lastUpdatedById,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      };
+      state.projectFinancialSettings.push(created);
+      logOperation('projectFinancialSettings', 'create', { projectId: created.projectId });
+      return { ...created };
+    }
+    if (params.update.billingModel !== undefined) {
+      existing.billingModel = params.update.billingModel;
+    }
+    if (params.update.currency !== undefined) {
+      existing.currency = params.update.currency;
+    }
+    if (params.update.paymentTerms !== undefined) {
+      existing.paymentTerms = params.update.paymentTerms;
+    }
+    existing.lastUpdatedById = params.update.lastUpdatedById;
+    existing.updatedAt = timestamp;
+    logOperation('projectFinancialSettings', 'update', { projectId: existing.projectId });
+    return { ...existing };
+  }
+}
+
+class BillingScheduleItemModel {
+  async findMany(params: { where: { projectId?: number } }): Promise<BillingScheduleItem[]> {
+    const { projectId } = params.where;
+    return state.billingScheduleItems
+      .filter((item) => (projectId ? item.projectId === projectId : true))
+      .map((item) => ({ ...item }));
+  }
+
+  async findUnique(params: { where: { id: number } }): Promise<BillingScheduleItem | null> {
+    const item = state.billingScheduleItems.find((entry) => entry.id === params.where.id);
+    return item ? { ...item } : null;
+  }
+
+  async create(params: {
+    data: {
+      projectId: number;
+      type: BillingModel;
+      name: string;
+      dueDate: Date;
+      amount: number;
+      currency: CurrencyCode;
+      status?: BillingStatus;
+      notes?: string | null;
+    };
+  }): Promise<BillingScheduleItem> {
+    const timestamp = now();
+    const item: BillingScheduleItem = {
+      id: nextId('billingScheduleItems'),
+      projectId: params.data.projectId,
+      type: params.data.type,
+      name: params.data.name,
+      dueDate: params.data.dueDate,
+      amount: params.data.amount,
+      currency: params.data.currency,
+      status: params.data.status ?? 'PLANNED',
+      notes: params.data.notes ?? null,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+    state.billingScheduleItems.push(item);
+    logOperation('billingScheduleItem', 'create', { id: item.id, projectId: item.projectId });
+    return { ...item };
+  }
+
+  async update(params: {
+    where: { id: number };
+    data: Partial<Pick<BillingScheduleItem, 'name' | 'dueDate' | 'amount' | 'status' | 'notes' | 'type' | 'currency'>>;
+  }): Promise<BillingScheduleItem> {
+    const item = state.billingScheduleItems.find((entry) => entry.id === params.where.id);
+    if (!item) {
+      throw new Error('Billing schedule item not found');
+    }
+    if (params.data.name !== undefined) {
+      item.name = params.data.name;
+    }
+    if (params.data.dueDate !== undefined) {
+      item.dueDate = params.data.dueDate;
+    }
+    if (params.data.amount !== undefined) {
+      item.amount = params.data.amount;
+    }
+    if (params.data.status !== undefined) {
+      item.status = params.data.status;
+    }
+    if (params.data.notes !== undefined) {
+      item.notes = params.data.notes;
+    }
+    if (params.data.type !== undefined) {
+      item.type = params.data.type;
+    }
+    if (params.data.currency !== undefined) {
+      item.currency = params.data.currency;
+    }
+    item.updatedAt = now();
+    logOperation('billingScheduleItem', 'update', { id: item.id });
+    return { ...item };
+  }
+}
+
 class ProjectDocumentModel {
   async findMany(params: {
     where: { projectId?: number; status?: DocumentStatus; category?: DocumentCategory };
@@ -1635,6 +2027,10 @@ export class PrismaClient {
   approval = new ApprovalModel();
   initiative = new InitiativeModel();
   initiativeAssignment = new InitiativeAssignmentModel();
+  consultant = new ConsultantModel();
+  staffingAssignment = new StaffingAssignmentModel();
+  projectFinancialSettings = new ProjectFinancialSettingsModel();
+  billingScheduleItem = new BillingScheduleItemModel();
   projectDocument = new ProjectDocumentModel();
   projectDocumentVersion = new ProjectDocumentVersionModel();
 
