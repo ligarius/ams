@@ -559,6 +559,7 @@ const seed = () => {
   const tenantId = nextId('tenants');
   const timestamp = now();
   const slug = 'acme-consulting';
+  const addDays = (base: Date, days: number) => new Date(base.getTime() + days * 24 * 60 * 60 * 1000);
   state.tenants.push({
     id: tenantId,
     name: 'Acme Consulting',
@@ -607,6 +608,30 @@ const seed = () => {
     updatedAt: timestamp,
   });
 
+  const consultantId = nextId('users');
+  state.users.push({
+    id: consultantId,
+    email: 'consultant@example.com',
+    passwordHash: bcrypt.hashSync('Consult123!', 10),
+    role: 'CONSULTANT',
+    failedLoginAttempts: 0,
+    lockedUntil: null,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  });
+
+  const clientId = nextId('users');
+  state.users.push({
+    id: clientId,
+    email: 'client@example.com',
+    passwordHash: bcrypt.hashSync('Client123!', 10),
+    role: 'CLIENT',
+    failedLoginAttempts: 0,
+    lockedUntil: null,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  });
+
   const companyId = nextId('companies');
   state.companies.push({
     id: companyId,
@@ -615,12 +640,474 @@ const seed = () => {
     updatedAt: timestamp,
   });
 
+  const projectId = nextId('projects');
+  state.projects.push({
+    id: projectId,
+    companyId,
+    name: 'Programa de Control Financiero 2024',
+    description:
+      'Fortalecimiento de controles SOX, automatización de conciliaciones y mejoras al programa de monitoreo continuo.',
+    createdById: adminId,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  });
+
+  const projectMemberships: Array<{ userId: number; role: UserRole }> = [
+    { userId: adminId, role: 'ADMIN' },
+    { userId: consultantId, role: 'CONSULTANT' },
+    { userId: clientId, role: 'CLIENT' },
+  ];
+  for (const membership of projectMemberships) {
+    state.memberships.push({
+      id: nextId('memberships'),
+      projectId,
+      userId: membership.userId,
+      role: membership.role,
+      createdAt: timestamp,
+    });
+  }
+
   state.auditLogs.push({
     id: nextId('auditLogs'),
     userId: adminId,
     action: 'SEED',
     metadata: { version: 'sprint-1', env: env.NODE_ENV, tenantSlug: slug },
     createdAt: timestamp,
+  });
+
+  state.auditLogs.push({
+    id: nextId('auditLogs'),
+    userId: adminId,
+    action: 'PROJECT_CREATED',
+    metadata: { projectId, companyId, name: 'Programa de Control Financiero 2024' },
+    createdAt: timestamp,
+  });
+
+  const categories = [
+    {
+      id: nextId('projectCategories'),
+      projectId,
+      name: 'Gobernanza y Supervisión',
+      description: 'Estructura de gobierno y comités de seguimiento del programa.',
+      createdAt: timestamp,
+    },
+    {
+      id: nextId('projectCategories'),
+      projectId,
+      name: 'Procesos Críticos',
+      description: 'Procesos financieros con mayor exposición a riesgos SOX.',
+      createdAt: timestamp,
+    },
+    {
+      id: nextId('projectCategories'),
+      projectId,
+      name: 'Tecnología y Automatización',
+      description: 'Oportunidades de automatización y digitalización de controles.',
+      createdAt: timestamp,
+    },
+  ];
+  state.projectCategories.push(...categories);
+
+  const risks = [
+    {
+      id: nextId('projectRisks'),
+      projectId,
+      categoryId: categories[1].id,
+      title: 'Segregación de funciones insuficiente en pagos',
+      description:
+        'Se identificaron usuarios con permisos incompatibles en el proceso de cuentas por pagar que elevan el riesgo de fraude.',
+      severity: 'HIGH' as const,
+      likelihood: 'MEDIUM' as const,
+      urgency: 'HIGH' as const,
+      complexity: 'MEDIUM' as const,
+      status: 'IN_PROGRESS' as const,
+      process: 'Cuentas por pagar',
+      system: 'SAP S/4HANA',
+      dataRequestId: null,
+      createdAt: timestamp,
+    },
+    {
+      id: nextId('projectRisks'),
+      projectId,
+      categoryId: categories[2].id,
+      title: 'Controles manuales sin evidencia digital',
+      description: 'Las aprobaciones de ajustes contables se realizan por correo sin trazabilidad centralizada.',
+      severity: 'MEDIUM' as const,
+      likelihood: 'HIGH' as const,
+      urgency: 'MEDIUM' as const,
+      complexity: 'LOW' as const,
+      status: 'OPEN' as const,
+      process: 'Cierre contable',
+      system: 'Plantillas ofimáticas',
+      dataRequestId: null,
+      createdAt: timestamp,
+    },
+  ];
+  state.projectRisks.push(...risks);
+
+  const checklists = [
+    {
+      id: nextId('projectChecklists'),
+      projectId,
+      name: 'Mapeo de procesos críticos',
+      dueDate: addDays(timestamp, 7),
+      status: 'PENDING' as const,
+      createdAt: timestamp,
+    },
+    {
+      id: nextId('projectChecklists'),
+      projectId,
+      name: 'Validación de controles SOX clave',
+      dueDate: addDays(timestamp, 14),
+      status: 'PENDING' as const,
+      createdAt: timestamp,
+    },
+    {
+      id: nextId('projectChecklists'),
+      projectId,
+      name: 'Entrega de informe ejecutivo inicial',
+      dueDate: addDays(timestamp, 21),
+      status: 'COMPLETED' as const,
+      createdAt: timestamp,
+    },
+  ];
+  state.projectChecklists.push(...checklists);
+
+  const kpis = [
+    {
+      id: nextId('projectKpis'),
+      projectId,
+      name: 'Controles certificados',
+      target: 18,
+      current: 9,
+      unit: 'controles',
+      trend: 'UP' as const,
+      createdAt: timestamp,
+    },
+    {
+      id: nextId('projectKpis'),
+      projectId,
+      name: 'Hallazgos mitigados',
+      target: 12,
+      current: 4,
+      unit: 'hallazgos',
+      trend: 'STABLE' as const,
+      createdAt: timestamp,
+    },
+    {
+      id: nextId('projectKpis'),
+      projectId,
+      name: 'Porcentaje de evidencias cargadas',
+      target: 100,
+      current: 65,
+      unit: '%',
+      trend: 'UP' as const,
+      createdAt: timestamp,
+    },
+  ];
+  state.projectKpis.push(...kpis);
+
+  const governanceEvents = [
+    {
+      id: nextId('governanceEvents'),
+      projectId,
+      type: 'STEERING_COMMITTEE' as const,
+      name: 'Comité Directivo Mensual',
+      cadence: 'MONTHLY' as const,
+      owner: 'María López (CFO)',
+      nextMeetingAt: addDays(timestamp, 10),
+      createdAt: timestamp,
+    },
+    {
+      id: nextId('governanceEvents'),
+      projectId,
+      type: 'WORKING_GROUP' as const,
+      name: 'Célula de trabajo semanal',
+      cadence: 'WEEKLY' as const,
+      owner: 'Carlos Pérez (PMO)',
+      nextMeetingAt: addDays(timestamp, 7),
+      createdAt: timestamp,
+    },
+    {
+      id: nextId('governanceEvents'),
+      projectId,
+      type: 'SPONSOR_CHECKIN' as const,
+      name: 'Check-in quincenal con sponsor',
+      cadence: 'BIWEEKLY' as const,
+      owner: 'Ana Rivas (Sponsor Ejecutivo)',
+      nextMeetingAt: addDays(timestamp, 15),
+      createdAt: timestamp,
+    },
+  ];
+  state.governanceEvents.push(...governanceEvents);
+
+  const dataRequests = [
+    {
+      id: nextId('dataRequests'),
+      projectId,
+      title: 'Extracto de gastos operativos Q1',
+      description: 'Detalle mensual de gastos operativos con clasificación de centros de costo.',
+      dueDate: addDays(timestamp, 5),
+      status: 'IN_REVIEW' as const,
+      createdById: consultantId,
+      assignedToId: clientId,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    },
+    {
+      id: nextId('dataRequests'),
+      projectId,
+      title: 'Políticas y procedimientos de tesorería',
+      description: 'Versión vigente de políticas, responsables y evidencia de difusión.',
+      dueDate: addDays(timestamp, -2),
+      status: 'APPROVED' as const,
+      createdById: adminId,
+      assignedToId: clientId,
+      createdAt: timestamp,
+      updatedAt: addDays(timestamp, -1),
+    },
+  ];
+  state.dataRequests.push(...dataRequests);
+
+  state.dataRequestAttachments.push({
+    id: nextId('dataRequestAttachments'),
+    dataRequestId: dataRequests[0].id,
+    fileName: 'gastos-operativos-q1.xlsx',
+    content: 'UEsDBAoAAAAAA...',
+    uploadedById: clientId,
+    uploadedAt: addDays(timestamp, 1),
+  });
+
+  const findings = [
+    {
+      id: nextId('findings'),
+      projectId,
+      riskId: risks[0].id,
+      dataRequestId: dataRequests[0].id,
+      title: 'Usuarios con permisos conflictivos',
+      description: 'Se detectaron 12 combinaciones de permisos que permiten crear y aprobar pagos sin revisión independiente.',
+      status: 'IN_REVIEW' as const,
+      createdById: consultantId,
+      updatedAt: addDays(timestamp, 2),
+      createdAt: timestamp,
+    },
+    {
+      id: nextId('findings'),
+      projectId,
+      riskId: risks[1].id,
+      dataRequestId: null,
+      title: 'Evidencia dispersa en correos',
+      description: 'El 70% de aprobaciones se encuentra en correos individuales sin repositorio común.',
+      status: 'OPEN' as const,
+      createdById: consultantId,
+      updatedAt: timestamp,
+      createdAt: timestamp,
+    },
+  ];
+  state.findings.push(...findings);
+
+  state.approvals.push({
+    id: nextId('approvals'),
+    projectId,
+    title: 'Aprobación plan de remediación Fase 1',
+    description: 'Plan priorizado de remediación de controles críticos para el trimestre.',
+    status: 'APPROVED',
+    createdById: adminId,
+    decidedById: clientId,
+    decidedAt: addDays(timestamp, 3),
+    signatureEnvelopeId: 'env-2024-001',
+    signatureDocumentId: 'doc-2024-001',
+    signatureUrl: 'https://sign.acme.example.com/envelopes/env-2024-001',
+    signatureStatus: 'SIGNED',
+    signatureSentAt: addDays(timestamp, 1),
+    signatureCompletedAt: addDays(timestamp, 3),
+    signatureDeclinedAt: null,
+    createdAt: timestamp,
+    updatedAt: addDays(timestamp, 3),
+  });
+
+  const initiatives = [
+    {
+      id: nextId('initiatives'),
+      projectId,
+      title: 'Automatización de conciliaciones bancarias',
+      description: 'Implementación de robot RPA para conciliaciones diarias y alertas de excepciones.',
+      type: 'PROJECT' as const,
+      status: 'IN_PROGRESS' as const,
+      resourceSummary: 'Equipo mixto de finanzas, TI y consultores con 60% dedicación.',
+      startDate: timestamp,
+      endDate: addDays(timestamp, 60),
+      estimatedBudget: 18000,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    },
+    {
+      id: nextId('initiatives'),
+      projectId,
+      title: 'Capacitación en controles clave',
+      description: 'Sesiones de formación para dueños de proceso y creación de manuales de operación.',
+      type: 'QUICK_WIN' as const,
+      status: 'PLANNED' as const,
+      resourceSummary: 'Consultor senior y equipo de capital humano.',
+      startDate: addDays(timestamp, 10),
+      endDate: addDays(timestamp, 25),
+      estimatedBudget: 4500,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    },
+  ];
+  state.initiatives.push(...initiatives);
+
+  state.initiativeAssignments.push(
+    {
+      id: nextId('initiativeAssignments'),
+      initiativeId: initiatives[0].id,
+      userId: consultantId,
+      role: 'Líder de automatización',
+      allocationPercentage: 60,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    },
+    {
+      id: nextId('initiativeAssignments'),
+      initiativeId: initiatives[1].id,
+      userId: adminId,
+      role: 'Sponsor de capacitación',
+      allocationPercentage: 20,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    }
+  );
+
+  const consultants = [
+    {
+      id: nextId('consultants'),
+      name: 'Laura Rivas',
+      email: 'laura.rivas@acmeconsulting.com',
+      title: 'Gerente de Riesgos',
+      seniority: 'MANAGER' as const,
+      practiceArea: 'Risk Advisory',
+      skills: ['SOX', 'RPA', 'Gestión del cambio'],
+      costRate: 85,
+      billableRate: 180,
+      weeklyCapacity: 40,
+      isActive: true,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    },
+    {
+      id: nextId('consultants'),
+      name: 'Diego Morales',
+      email: 'diego.morales@acmeconsulting.com',
+      title: 'Consultor Senior',
+      seniority: 'SENIOR' as const,
+      practiceArea: 'Automation',
+      skills: ['Power Automate', 'SAP', 'Data Analytics'],
+      costRate: 65,
+      billableRate: 140,
+      weeklyCapacity: 32,
+      isActive: true,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    },
+  ];
+  state.consultants.push(...consultants);
+
+  state.staffingAssignments.push(
+    {
+      id: nextId('staffingAssignments'),
+      consultantId: consultants[0].id,
+      projectId,
+      startDate: timestamp,
+      endDate: addDays(timestamp, 45),
+      allocation: 0.75,
+      hoursPerWeek: 30,
+      billable: true,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    },
+    {
+      id: nextId('staffingAssignments'),
+      consultantId: consultants[1].id,
+      projectId,
+      startDate: addDays(timestamp, 3),
+      endDate: null,
+      allocation: 0.5,
+      hoursPerWeek: 20,
+      billable: true,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    }
+  );
+
+  state.projectFinancialSettings.push({
+    id: nextId('projectFinancialSettings'),
+    projectId,
+    billingModel: 'MILESTONE',
+    currency: 'USD',
+    paymentTerms: '30 días neto',
+    lastUpdatedById: adminId,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  });
+
+  state.billingScheduleItems.push(
+    {
+      id: nextId('billingScheduleItems'),
+      projectId,
+      type: 'MILESTONE',
+      name: 'Entrega Diagnóstico Inicial',
+      dueDate: addDays(timestamp, 15),
+      amount: 25000,
+      currency: 'USD',
+      status: 'INVOICED',
+      notes: 'Factura enviada el día 10',
+      createdAt: timestamp,
+      updatedAt: addDays(timestamp, 10),
+    },
+    {
+      id: nextId('billingScheduleItems'),
+      projectId,
+      type: 'MILESTONE',
+      name: 'Implementación RPA',
+      dueDate: addDays(timestamp, 55),
+      amount: 40000,
+      currency: 'USD',
+      status: 'PLANNED',
+      notes: 'Dependiente de aprobación de presupuesto TI',
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    }
+  );
+
+  const documentId = nextId('projectDocuments');
+  const documentVersionId = nextId('projectDocumentVersions');
+  state.projectDocumentVersions.push({
+    id: documentVersionId,
+    documentId,
+    version: 1,
+    fileName: 'plan-remediacion-fase1-v1.docx',
+    content: 'Plan detallado de actividades, responsables y cronograma.',
+    checksum: 'b6f8d1e4',
+    note: 'Versión inicial enviada a sponsor.',
+    createdById: consultantId,
+    createdAt: timestamp,
+  });
+
+  state.projectDocuments.push({
+    id: documentId,
+    projectId,
+    title: 'Plan de remediación Fase 1',
+    description: 'Documento que consolida acciones, responsables y dependencias para la primera fase.',
+    category: 'DELIVERABLE',
+    status: 'IN_REVIEW',
+    tags: ['remediación', 'prioridad-alta'],
+    createdById: consultantId,
+    updatedById: consultantId,
+    currentVersionId: documentVersionId,
+    publishedAt: null,
+    createdAt: timestamp,
+    updatedAt: timestamp,
   });
 
   const templateId = nextId('templates');
@@ -669,6 +1156,64 @@ const seed = () => {
   state.templateVersions.push(templateVersion);
   templateRecord.currentVersionId = templateVersionId;
   templateRecord.currentVersionNumber = 1;
+
+  state.templateUsages.push({
+    id: nextId('templateUsages'),
+    templateId,
+    projectId,
+    usedById: consultantId,
+    rating: 5,
+    notes: 'Plantilla muy útil para estandarizar la documentación de controles.',
+    observedBenefits: ['Reducción del tiempo de diseño', 'Mejor trazabilidad de riesgos'],
+    createdAt: addDays(timestamp, 2),
+  });
+  templateRecord.usageCount += 1;
+  templateRecord.ratingSum += 5;
+  templateRecord.ratingCount += 1;
+
+  state.benchmarkSnapshots.push({
+    id: nextId('benchmarkSnapshots'),
+    projectId,
+    generatedAt: addDays(timestamp, -1),
+    metrics: {
+      maturityScore: 62,
+      controlCoverage: 0.68,
+      automationIndex: 0.45,
+    },
+    comparisons: {
+      industryPercentile: 55,
+      peerGroupDelta: {
+        controlCoverage: -0.07,
+        automationIndex: 0.1,
+      },
+    },
+    insights: [
+      {
+        id: 'insight-automation',
+        title: 'Automatización por debajo del promedio',
+        description: 'Las empresas top quartile tienen 30% más procesos automatizados en conciliaciones.',
+        impact: 4,
+        tags: ['automatización', 'benchmark'],
+      },
+      {
+        id: 'insight-governance',
+        title: 'Frecuencia de comités adecuada',
+        description: 'El programa mantiene cadencia mensual alineada a las mejores prácticas de la industria.',
+        impact: 3,
+        tags: ['gobernanza'],
+      },
+    ],
+  });
+
+  state.benchmarkFeedback.push({
+    id: nextId('benchmarkFeedback'),
+    projectId,
+    userId: clientId,
+    usefulness: 4,
+    confidence: 3,
+    comment: 'El benchmark destaca claramente dónde enfocar inversiones en automatización.',
+    submittedAt: addDays(timestamp, 1),
+  });
 
   const connectorBaseConfig = {
     sandboxUrl: 'https://sandbox.integration.local',
