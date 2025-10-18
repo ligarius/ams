@@ -53,7 +53,7 @@ const templateSearchSchema = z.object({
     .transform((value) => filterArray(value))
     .optional(),
   maturity: templateMaturitySchema.optional(),
-  limit: z.number().int().min(1).max(50).optional(),
+  limit: z.coerce.number().int().min(1).max(50).optional(),
 });
 
 const templateVersionSchema = z.object({
