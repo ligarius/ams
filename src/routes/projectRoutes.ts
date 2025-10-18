@@ -43,6 +43,7 @@ import {
   updateBillingConfig,
   updateBillingScheduleItem,
 } from '@/services/financialService';
+import { generateProjectRecommendations } from '@/services/recommendationService';
 
 const router = Router();
 
@@ -104,6 +105,28 @@ router.get('/:id/overview', async (req: AuthenticatedRequest, res) => {
     }
     const overview = await getProjectOverview(projectId, req.user!);
     return res.json(overview);
+  } catch (error) {
+    if (error instanceof Error) {
+      if (error.message === 'Project not found') {
+        return res.status(404).json({ message: error.message });
+      }
+      if (error.message === 'Insufficient permissions') {
+        return res.status(403).json({ message: error.message });
+      }
+      return res.status(400).json({ message: error.message });
+    }
+    return res.status(500).json({ message: 'Unexpected error' });
+  }
+});
+
+router.get('/:id/recommendations', async (req: AuthenticatedRequest, res) => {
+  try {
+    const projectId = Number(req.params.id);
+    if (Number.isNaN(projectId)) {
+      return res.status(400).json({ message: 'Invalid project id' });
+    }
+    const recommendations = await generateProjectRecommendations(projectId, req.user!);
+    return res.json(recommendations);
   } catch (error) {
     if (error instanceof Error) {
       if (error.message === 'Project not found') {
