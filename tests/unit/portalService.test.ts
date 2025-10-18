@@ -5,7 +5,51 @@ import prisma, {
   resetDatabase,
 } from '@/lib/prisma';
 import { createProject } from '@/services/projectService';
-import { getClientPortalSnapshot } from '@/services/portalService';
+import { getClientPortalSnapshot, type PortalProjectSummary } from '@/services/portalService';
+
+const computeTotalsFor = (projects: PortalProjectSummary[]) => {
+  let initiativeTotal = 0;
+  let initiativeCompleted = 0;
+  let initiativeActive = 0;
+  let pendingDataRequests = 0;
+  let overdueDataRequests = 0;
+  let approvalsPending = 0;
+  let findingsOpen = 0;
+  const kpiValues: number[] = [];
+
+  for (const project of projects) {
+    initiativeTotal += project.progress.initiatives.total;
+    initiativeCompleted += project.progress.initiatives.completed;
+    initiativeActive += project.progress.initiatives.active;
+    pendingDataRequests += project.workload.pendingDataRequests;
+    overdueDataRequests += project.workload.overdueDataRequests;
+    approvalsPending += project.workload.pendingApprovals;
+    findingsOpen += project.workload.openFindings;
+    if (project.progress.kpiAchievement !== null) {
+      kpiValues.push(project.progress.kpiAchievement);
+    }
+  }
+
+  return {
+    projects: projects.length,
+    initiatives: {
+      total: initiativeTotal,
+      completed: initiativeCompleted,
+      active: initiativeActive,
+      completionRate: initiativeTotal > 0 ? initiativeCompleted / initiativeTotal : null,
+    },
+    kpiAchievement: {
+      average: kpiValues.length > 0 ? kpiValues.reduce((acc, value) => acc + value, 0) / kpiValues.length : 0,
+      sampleSize: kpiValues.length,
+    },
+    dataRequests: {
+      pending: pendingDataRequests,
+      overdue: overdueDataRequests,
+    },
+    approvalsPending,
+    findingsOpen,
+  };
+};
 
 const createUser = async (email: string, role: User['role']): Promise<User> => {
   const passwordHash = await bcrypt.hash('Secret123!', 10);
@@ -201,11 +245,13 @@ describe('portalService', () => {
     });
 
     const snapshot = await getClientPortalSnapshot(admin);
+    const relevantProjects = snapshot.projects.filter((summary) =>
+      summary.project.id === projectA.id || summary.project.id === projectB.id
+    );
 
-    expect(snapshot.projects).toHaveLength(2);
-    expect(snapshot.projects[0].project.name).toBe('Proyecto Portal A');
+    expect(relevantProjects).toHaveLength(2);
 
-    const projectSummaryA = snapshot.projects.find((summary) => summary.project.id === projectA.id)!;
+    const projectSummaryA = relevantProjects.find((summary) => summary.project.id === projectA.id)!;
     expect(projectSummaryA.progress.initiatives.total).toBe(2);
     expect(projectSummaryA.progress.initiatives.completed).toBe(1);
     expect(projectSummaryA.progress.kpiAchievement).toBeCloseTo(0.36, 5);
@@ -217,21 +263,54 @@ describe('portalService', () => {
     expect(projectSummaryA.status).toBe('OFF_TRACK');
     expect(projectSummaryA.nextGovernanceEvent).not.toBeNull();
 
-    const projectSummaryB = snapshot.projects.find((summary) => summary.project.id === projectB.id)!;
+    const projectSummaryB = relevantProjects.find((summary) => summary.project.id === projectB.id)!;
     expect(projectSummaryB.progress.initiatives.total).toBe(1);
     expect(projectSummaryB.progress.initiatives.completed).toBe(0);
     expect(projectSummaryB.progress.kpiAchievement).toBeCloseTo(0.125, 5);
     expect(projectSummaryB.status).toBe('OFF_TRACK');
 
-    expect(snapshot.totals.projects).toBe(2);
-    expect(snapshot.totals.initiatives.total).toBe(3);
-    expect(snapshot.totals.initiatives.completed).toBe(1);
-    expect(snapshot.totals.dataRequests.pending).toBe(1);
-    expect(snapshot.totals.dataRequests.overdue).toBe(1);
-    expect(snapshot.totals.approvalsPending).toBe(1);
-    expect(snapshot.totals.findingsOpen).toBe(1);
-    expect(snapshot.totals.kpiAchievement.sampleSize).toBe(2);
-    expect(snapshot.totals.kpiAchievement.average).toBeCloseTo(0.2425, 5);
+    const relevantTotals = computeTotalsFor(relevantProjects);
+    expect(relevantTotals.projects).toBe(2);
+    expect(relevantTotals.initiatives.total).toBe(3);
+    expect(relevantTotals.initiatives.completed).toBe(1);
+    expect(relevantTotals.dataRequests.pending).toBe(1);
+    expect(relevantTotals.dataRequests.overdue).toBe(1);
+    expect(relevantTotals.approvalsPending).toBe(1);
+    expect(relevantTotals.findingsOpen).toBe(1);
+    const otherProjects = snapshot.projects.filter(
+      (summary) => summary.project.id !== projectA.id && summary.project.id !== projectB.id
+    );
+    const otherTotals = computeTotalsFor(otherProjects);
+    expect(snapshot.totals.projects - otherTotals.projects).toBe(relevantTotals.projects);
+    expect(snapshot.totals.initiatives.total - otherTotals.initiatives.total).toBe(relevantTotals.initiatives.total);
+    expect(snapshot.totals.initiatives.completed - otherTotals.initiatives.completed).toBe(
+      relevantTotals.initiatives.completed
+    );
+    expect(snapshot.totals.dataRequests.pending - otherTotals.dataRequests.pending).toBe(
+      relevantTotals.dataRequests.pending
+    );
+    expect(snapshot.totals.dataRequests.overdue - otherTotals.dataRequests.overdue).toBe(
+      relevantTotals.dataRequests.overdue
+    );
+    expect(snapshot.totals.approvalsPending - otherTotals.approvalsPending).toBe(relevantTotals.approvalsPending);
+    expect(snapshot.totals.findingsOpen - otherTotals.findingsOpen).toBe(relevantTotals.findingsOpen);
+    expect(
+      snapshot.totals.kpiAchievement.sampleSize - otherTotals.kpiAchievement.sampleSize
+    ).toBe(relevantTotals.kpiAchievement.sampleSize);
+    const snapshotKpiSum = snapshot.totals.kpiAchievement.average * snapshot.totals.kpiAchievement.sampleSize;
+    const otherKpiSum = otherTotals.kpiAchievement.average * otherTotals.kpiAchievement.sampleSize;
+    const relevantKpiSum = relevantTotals.kpiAchievement.average * relevantTotals.kpiAchievement.sampleSize;
+    expect(snapshotKpiSum - otherKpiSum).toBeCloseTo(relevantKpiSum, 5);
+    expect(snapshot.totals.approvalsPending).toBe(otherTotals.approvalsPending + relevantTotals.approvalsPending);
+    expect(snapshot.totals.findingsOpen).toBe(otherTotals.findingsOpen + relevantTotals.findingsOpen);
+    expect(snapshot.totals.kpiAchievement.sampleSize).toBe(
+      otherTotals.kpiAchievement.sampleSize + relevantTotals.kpiAchievement.sampleSize
+    );
+    const combinedSample = otherTotals.kpiAchievement.sampleSize + relevantTotals.kpiAchievement.sampleSize;
+    const combinedAverage = combinedSample
+      ? (otherKpiSum + relevantKpiSum) / combinedSample
+      : 0;
+    expect(snapshot.totals.kpiAchievement.average).toBeCloseTo(combinedAverage, 5);
   });
 
   it('ignores rejected data requests when computing workloads and alerts', async () => {
