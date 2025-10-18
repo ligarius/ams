@@ -330,6 +330,105 @@ export interface ProjectDocumentVersion {
   createdAt: Date;
 }
 
+export type TemplateKind = 'CHECKLIST' | 'PLAYBOOK' | 'DELIVERABLE' | 'RISK_LIBRARY';
+export type TemplateMaturity = 'FOUNDATIONAL' | 'ADVANCED' | 'EXPERT';
+
+export interface Template {
+  id: number;
+  name: string;
+  slug: string;
+  kind: TemplateKind;
+  category: string;
+  description: string | null;
+  tags: string[];
+  industries: string[];
+  maturity: TemplateMaturity;
+  searchVector: string;
+  createdById: number;
+  updatedById: number;
+  createdAt: Date;
+  updatedAt: Date;
+  currentVersionId: number | null;
+  currentVersionNumber: number | null;
+  usageCount: number;
+  ratingSum: number;
+  ratingCount: number;
+}
+
+export interface TemplateVersion {
+  id: number;
+  templateId: number;
+  versionNumber: number;
+  isMajor: boolean;
+  changeLog: string;
+  summary: string;
+  content: string;
+  estimatedEffortHours: number;
+  recommendedRoles: string[];
+  deliverables: string[];
+  maturityFocus: TemplateMaturity;
+  createdById: number;
+  createdAt: Date;
+}
+
+export interface TemplateUsage {
+  id: number;
+  templateId: number;
+  projectId: number;
+  usedById: number;
+  rating: number | null;
+  notes: string | null;
+  observedBenefits: string[];
+  createdAt: Date;
+}
+
+export type ConnectorType = 'ERP' | 'CRM' | 'BI';
+export type ConnectorProtocol = 'REST' | 'GRAPHQL';
+export type ConnectorStatus = 'READY' | 'CONNECTED' | 'ERROR';
+export type ConnectorAuthType = 'OAUTH2' | 'API_KEY';
+
+export interface IntegrationConnector {
+  id: number;
+  key: string;
+  name: string;
+  vendor: string;
+  type: ConnectorType;
+  protocol: ConnectorProtocol;
+  authType: ConnectorAuthType;
+  capabilities: string[];
+  supportedEntities: string[];
+  configuration: Record<string, unknown>;
+  status: ConnectorStatus;
+  lastSyncedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export type SyncStatus = 'SUCCESS' | 'FAILED';
+
+export interface ConnectorSyncRun {
+  id: number;
+  connectorId: number;
+  startedAt: Date;
+  finishedAt: Date;
+  status: SyncStatus;
+  recordsPulled: number;
+  errorMessage: string | null;
+  datasetId: number | null;
+}
+
+export type BiDatasetFormat = 'POWER_BI' | 'TABLEAU';
+
+export interface BiDataset {
+  id: number;
+  connectorId: number;
+  name: string;
+  format: BiDatasetFormat;
+  schemaVersion: string;
+  content: Record<string, unknown>;
+  createdAt: Date;
+}
+
 interface DatabaseState {
   tenants: Tenant[];
   tenantAreas: TenantArea[];
@@ -357,6 +456,12 @@ interface DatabaseState {
   billingScheduleItems: BillingScheduleItem[];
   projectDocuments: ProjectDocument[];
   projectDocumentVersions: ProjectDocumentVersion[];
+  templates: Template[];
+  templateVersions: TemplateVersion[];
+  templateUsages: TemplateUsage[];
+  integrationConnectors: IntegrationConnector[];
+  connectorSyncRuns: ConnectorSyncRun[];
+  biDatasets: BiDataset[];
   sequences: Record<string, number>;
 }
 
@@ -387,6 +492,12 @@ const createEmptyState = (): DatabaseState => ({
   billingScheduleItems: [],
   projectDocuments: [],
   projectDocumentVersions: [],
+  templates: [],
+  templateVersions: [],
+  templateUsages: [],
+  integrationConnectors: [],
+  connectorSyncRuns: [],
+  biDatasets: [],
   sequences: {},
 });
 
@@ -479,6 +590,130 @@ const seed = () => {
     action: 'SEED',
     metadata: { version: 'sprint-1', env: env.NODE_ENV, tenantSlug: slug },
     createdAt: timestamp,
+  });
+
+  const templateId = nextId('templates');
+  const templateRecord: Template = {
+    id: templateId,
+    name: 'Playbook de Control Interno',
+    slug: 'playbook-control-interno',
+    kind: 'PLAYBOOK',
+    category: 'Gobernanza y Riesgos',
+    description:
+      'Guía estructurada para implementar controles internos críticos y establecer un programa de monitoreo continuo.',
+    tags: ['controles', 'riesgos', 'madurez'],
+    industries: ['Servicios Financieros', 'Retail'],
+    maturity: 'ADVANCED',
+    searchVector:
+      'playbook control interno gobernanza riesgos guia controles riesgos madurez servicios financieros retail monitoreo continuo',
+    createdById: adminId,
+    updatedById: adminId,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+    currentVersionId: null,
+    currentVersionNumber: null,
+    usageCount: 6,
+    ratingSum: 26,
+    ratingCount: 6,
+  };
+  state.templates.push(templateRecord);
+
+  const templateVersionId = nextId('templateVersions');
+  const templateVersion: TemplateVersion = {
+    id: templateVersionId,
+    templateId,
+    versionNumber: 1,
+    isMajor: true,
+    changeLog: 'Versión inicial alineada al sprint 8',
+    summary: 'Pasos detallados para evaluar, diseñar y activar controles internos prioritarios.',
+    content:
+      '1. Levantamiento de controles actuales\n2. Evaluación de madurez\n3. Diseño de plan de remediación\n4. Implementación y seguimiento',
+    estimatedEffortHours: 80,
+    recommendedRoles: ['Director Auditoría', 'Consultor Senior'],
+    deliverables: ['Mapa de controles', 'Plan de remediación', 'Dashboard de seguimiento'],
+    maturityFocus: 'ADVANCED',
+    createdById: adminId,
+    createdAt: timestamp,
+  };
+  state.templateVersions.push(templateVersion);
+  templateRecord.currentVersionId = templateVersionId;
+  templateRecord.currentVersionNumber = 1;
+
+  const connectorBaseConfig = {
+    sandboxUrl: 'https://sandbox.integration.local',
+    batchWindow: '0 3 * * *',
+    retentionDays: 30,
+  };
+
+  const sapConnector: IntegrationConnector = {
+    id: nextId('integrationConnectors'),
+    key: 'sap-s4hana',
+    name: 'SAP S/4HANA ERP',
+    vendor: 'SAP',
+    type: 'ERP',
+    protocol: 'REST',
+    authType: 'OAUTH2',
+    capabilities: ['master-data', 'financials', 'real-time-sync'],
+    supportedEntities: ['GLAccounts', 'CostCenters', 'Vendors'],
+    configuration: {
+      ...connectorBaseConfig,
+      baseUrl: 'https://sap.example.com/api',
+    },
+    status: 'READY',
+    lastSyncedAt: null,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+  state.integrationConnectors.push(sapConnector);
+
+  const salesforceConnector: IntegrationConnector = {
+    id: nextId('integrationConnectors'),
+    key: 'salesforce-crm',
+    name: 'Salesforce CRM',
+    vendor: 'Salesforce',
+    type: 'CRM',
+    protocol: 'GRAPHQL',
+    authType: 'OAUTH2',
+    capabilities: ['pipeline', 'accounts', 'activity-stream'],
+    supportedEntities: ['Opportunities', 'Accounts', 'Tasks'],
+    configuration: {
+      ...connectorBaseConfig,
+      baseUrl: 'https://salesforce.example.com/graphql',
+    },
+    status: 'CONNECTED',
+    lastSyncedAt: timestamp,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+  state.integrationConnectors.push(salesforceConnector);
+
+  const datasetId = nextId('biDatasets');
+  const dataset: BiDataset = {
+    id: datasetId,
+    connectorId: salesforceConnector.id,
+    name: 'Salesforce Pipeline Health',
+    format: 'POWER_BI',
+    schemaVersion: '2024.1',
+    content: {
+      measures: [
+        { name: 'WinRate', expression: 'WonDeals / TotalDeals' },
+        { name: 'AverageCycle', expression: 'AVERAGE(Opportunity[CloseDate] - Opportunity[CreatedDate])' },
+      ],
+      dimensions: ['OpportunityStage', 'Industry', 'OwnerRole'],
+    },
+    createdAt: timestamp,
+  };
+  state.biDatasets.push(dataset);
+
+  state.connectorSyncRuns.push({
+    id: nextId('connectorSyncRuns'),
+    connectorId: salesforceConnector.id,
+    startedAt: timestamp,
+    finishedAt: timestamp,
+    status: 'SUCCESS',
+    recordsPulled: 1240,
+    errorMessage: null,
+    datasetId,
   });
 };
 
@@ -1948,6 +2183,490 @@ class ProjectDocumentVersionModel {
   }
 }
 
+class TemplateModel {
+  async findUnique(params: { where: { id?: number; slug?: string } }): Promise<Template | null> {
+    const { id, slug } = params.where;
+    const template = state.templates.find(
+      (item) => (id ? item.id === id : true) && (slug ? item.slug === slug : true)
+    );
+    return template
+      ? {
+          ...template,
+          tags: [...template.tags],
+          industries: [...template.industries],
+        }
+      : null;
+  }
+
+  async findMany(params?: {
+    where?: { kind?: TemplateKind; industries?: string[]; tags?: string[] };
+  }): Promise<Template[]> {
+    const { where } = params ?? {};
+    let templates = [...state.templates];
+    if (where?.kind) {
+      templates = templates.filter((template) => template.kind === where.kind);
+    }
+    if (where?.industries && where.industries.length > 0) {
+      templates = templates.filter((template) =>
+        template.industries.some((industry) => where.industries!.includes(industry))
+      );
+    }
+    if (where?.tags && where.tags.length > 0) {
+      templates = templates.filter((template) =>
+        template.tags.some((tag) => where.tags!.includes(tag))
+      );
+    }
+    return templates.map((template) => ({
+      ...template,
+      tags: [...template.tags],
+      industries: [...template.industries],
+    }));
+  }
+
+  async create(params: {
+    data: Omit<
+      Template,
+      'id' | 'createdAt' | 'updatedAt' | 'currentVersionId' | 'currentVersionNumber' | 'usageCount' | 'ratingSum' | 'ratingCount'
+    > & {
+      createdAt?: Date;
+      updatedAt?: Date;
+      currentVersionId?: number | null;
+      currentVersionNumber?: number | null;
+      usageCount?: number;
+      ratingSum?: number;
+      ratingCount?: number;
+    };
+  }): Promise<Template> {
+    const createdAt = params.data.createdAt ?? now();
+    const updatedAt = params.data.updatedAt ?? createdAt;
+    const template: Template = {
+      id: nextId('templates'),
+      name: params.data.name,
+      slug: params.data.slug,
+      kind: params.data.kind,
+      category: params.data.category,
+      description: params.data.description ?? null,
+      tags: [...params.data.tags],
+      industries: [...params.data.industries],
+      maturity: params.data.maturity,
+      searchVector: params.data.searchVector,
+      createdById: params.data.createdById,
+      updatedById: params.data.updatedById,
+      createdAt,
+      updatedAt,
+      currentVersionId: params.data.currentVersionId ?? null,
+      currentVersionNumber: params.data.currentVersionNumber ?? null,
+      usageCount: params.data.usageCount ?? 0,
+      ratingSum: params.data.ratingSum ?? 0,
+      ratingCount: params.data.ratingCount ?? 0,
+    };
+    state.templates.push(template);
+    logOperation('template', 'create', { id: template.id, slug: template.slug });
+    return {
+      ...template,
+      tags: [...template.tags],
+      industries: [...template.industries],
+    };
+  }
+
+  async update(params: {
+    where: { id: number };
+    data: Partial<
+      Omit<
+        Template,
+        'id' | 'createdAt' | 'tags' | 'industries' | 'searchVector' | 'name' | 'slug' | 'kind' | 'category'
+      > & {
+        tags: string[];
+        industries: string[];
+        searchVector: string;
+        name: string;
+        slug: string;
+        kind: TemplateKind;
+        category: string;
+      }
+    >;
+  }): Promise<Template> {
+    const template = state.templates.find((item) => item.id === params.where.id);
+    if (!template) {
+      throw new Error('Template not found');
+    }
+    const data = params.data;
+    if (data.name !== undefined) {
+      template.name = data.name;
+    }
+    if (data.slug !== undefined) {
+      template.slug = data.slug;
+    }
+    if (data.kind !== undefined) {
+      template.kind = data.kind;
+    }
+    if (data.category !== undefined) {
+      template.category = data.category;
+    }
+    if (data.description !== undefined) {
+      template.description = data.description;
+    }
+    if (data.tags !== undefined) {
+      template.tags = [...data.tags];
+    }
+    if (data.industries !== undefined) {
+      template.industries = [...data.industries];
+    }
+    if (data.maturity !== undefined) {
+      template.maturity = data.maturity;
+    }
+    if (data.searchVector !== undefined) {
+      template.searchVector = data.searchVector;
+    }
+    if (data.updatedById !== undefined) {
+      template.updatedById = data.updatedById;
+    }
+    if (data.currentVersionId !== undefined) {
+      template.currentVersionId = data.currentVersionId;
+    }
+    if (data.currentVersionNumber !== undefined) {
+      template.currentVersionNumber = data.currentVersionNumber;
+    }
+    if (data.usageCount !== undefined) {
+      template.usageCount = data.usageCount;
+    }
+    if (data.ratingSum !== undefined) {
+      template.ratingSum = data.ratingSum;
+    }
+    if (data.ratingCount !== undefined) {
+      template.ratingCount = data.ratingCount;
+    }
+    template.updatedAt = now();
+    logOperation('template', 'update', { id: template.id });
+    return {
+      ...template,
+      tags: [...template.tags],
+      industries: [...template.industries],
+    };
+  }
+}
+
+class TemplateVersionModel {
+  async findMany(params: { where: { templateId: number } }): Promise<TemplateVersion[]> {
+    return state.templateVersions
+      .filter((version) => version.templateId === params.where.templateId)
+      .map((version) => ({
+        ...version,
+        recommendedRoles: [...version.recommendedRoles],
+        deliverables: [...version.deliverables],
+      }))
+      .sort((a, b) => a.versionNumber - b.versionNumber);
+  }
+
+  async findUnique(params: { where: { id: number } }): Promise<TemplateVersion | null> {
+    const version = state.templateVersions.find((item) => item.id === params.where.id);
+    return version
+      ? {
+          ...version,
+          recommendedRoles: [...version.recommendedRoles],
+          deliverables: [...version.deliverables],
+        }
+      : null;
+  }
+
+  async create(params: {
+    data: {
+      templateId: number;
+      versionNumber?: number;
+      isMajor: boolean;
+      changeLog: string;
+      summary: string;
+      content: string;
+      estimatedEffortHours: number;
+      recommendedRoles: string[];
+      deliverables: string[];
+      maturityFocus: TemplateMaturity;
+      createdById: number;
+      createdAt?: Date;
+    };
+  }): Promise<TemplateVersion> {
+    const timestamp = params.data.createdAt ?? now();
+    const existing = state.templateVersions.filter(
+      (version) => version.templateId === params.data.templateId
+    );
+    const versionNumber =
+      params.data.versionNumber ??
+      existing.reduce((max, version) => Math.max(max, version.versionNumber), 0) + 1;
+    const version: TemplateVersion = {
+      id: nextId('templateVersions'),
+      templateId: params.data.templateId,
+      versionNumber,
+      isMajor: params.data.isMajor,
+      changeLog: params.data.changeLog,
+      summary: params.data.summary,
+      content: params.data.content,
+      estimatedEffortHours: params.data.estimatedEffortHours,
+      recommendedRoles: [...params.data.recommendedRoles],
+      deliverables: [...params.data.deliverables],
+      maturityFocus: params.data.maturityFocus,
+      createdById: params.data.createdById,
+      createdAt: timestamp,
+    };
+    state.templateVersions.push(version);
+    logOperation('templateVersion', 'create', {
+      id: version.id,
+      templateId: version.templateId,
+      versionNumber: version.versionNumber,
+    });
+    return {
+      ...version,
+      recommendedRoles: [...version.recommendedRoles],
+      deliverables: [...version.deliverables],
+    };
+  }
+}
+
+class TemplateUsageModel {
+  async findMany(params: { where: { templateId?: number; projectId?: number } }): Promise<TemplateUsage[]> {
+    const { templateId, projectId } = params.where;
+    return state.templateUsages
+      .filter((usage) => (templateId ? usage.templateId === templateId : true))
+      .filter((usage) => (projectId ? usage.projectId === projectId : true))
+      .map((usage) => ({
+        ...usage,
+        observedBenefits: [...usage.observedBenefits],
+      }));
+  }
+
+  async create(params: {
+    data: {
+      templateId: number;
+      projectId: number;
+      usedById: number;
+      rating?: number | null;
+      notes?: string | null;
+      observedBenefits?: string[];
+      createdAt?: Date;
+    };
+  }): Promise<TemplateUsage> {
+    const usage: TemplateUsage = {
+      id: nextId('templateUsages'),
+      templateId: params.data.templateId,
+      projectId: params.data.projectId,
+      usedById: params.data.usedById,
+      rating: params.data.rating ?? null,
+      notes: params.data.notes ?? null,
+      observedBenefits: [...(params.data.observedBenefits ?? [])],
+      createdAt: params.data.createdAt ?? now(),
+    };
+    state.templateUsages.push(usage);
+    logOperation('templateUsage', 'create', {
+      id: usage.id,
+      templateId: usage.templateId,
+      projectId: usage.projectId,
+    });
+    return {
+      ...usage,
+      observedBenefits: [...usage.observedBenefits],
+    };
+  }
+}
+
+class IntegrationConnectorModel {
+  async findMany(params?: {
+    where?: { type?: ConnectorType; status?: ConnectorStatus };
+  }): Promise<IntegrationConnector[]> {
+    const { where } = params ?? {};
+    return state.integrationConnectors
+      .filter((connector) => (where?.type ? connector.type === where.type : true))
+      .filter((connector) => (where?.status ? connector.status === where.status : true))
+      .map((connector) => ({
+        ...connector,
+        capabilities: [...connector.capabilities],
+        supportedEntities: [...connector.supportedEntities],
+        configuration: { ...connector.configuration },
+      }));
+  }
+
+  async findUnique(params: { where: { id?: number; key?: string } }): Promise<IntegrationConnector | null> {
+    const { id, key } = params.where;
+    const connector = state.integrationConnectors.find(
+      (item) => (id ? item.id === id : true) && (key ? item.key === key : true)
+    );
+    return connector
+      ? {
+          ...connector,
+          capabilities: [...connector.capabilities],
+          supportedEntities: [...connector.supportedEntities],
+          configuration: { ...connector.configuration },
+        }
+      : null;
+  }
+
+  async create(params: {
+    data: Omit<IntegrationConnector, 'id' | 'createdAt' | 'updatedAt'> & {
+      createdAt?: Date;
+      updatedAt?: Date;
+    };
+  }): Promise<IntegrationConnector> {
+    const createdAt = params.data.createdAt ?? now();
+    const connector: IntegrationConnector = {
+      id: nextId('integrationConnectors'),
+      key: params.data.key,
+      name: params.data.name,
+      vendor: params.data.vendor,
+      type: params.data.type,
+      protocol: params.data.protocol,
+      authType: params.data.authType,
+      capabilities: [...params.data.capabilities],
+      supportedEntities: [...params.data.supportedEntities],
+      configuration: { ...params.data.configuration },
+      status: params.data.status,
+      lastSyncedAt: params.data.lastSyncedAt ?? null,
+      createdAt,
+      updatedAt: params.data.updatedAt ?? createdAt,
+    };
+    state.integrationConnectors.push(connector);
+    logOperation('integrationConnector', 'create', { id: connector.id, key: connector.key });
+    return {
+      ...connector,
+      capabilities: [...connector.capabilities],
+      supportedEntities: [...connector.supportedEntities],
+      configuration: { ...connector.configuration },
+    };
+  }
+
+  async update(params: {
+    where: { id: number };
+    data: Partial<
+      Omit<IntegrationConnector, 'id' | 'createdAt' | 'capabilities' | 'supportedEntities' | 'configuration'> & {
+        capabilities: string[];
+        supportedEntities: string[];
+        configuration: Record<string, unknown>;
+      }
+    >;
+  }): Promise<IntegrationConnector> {
+    const connector = state.integrationConnectors.find((item) => item.id === params.where.id);
+    if (!connector) {
+      throw new Error('Integration connector not found');
+    }
+    const data = params.data;
+    if (data.name !== undefined) {
+      connector.name = data.name;
+    }
+    if (data.key !== undefined) {
+      connector.key = data.key;
+    }
+    if (data.vendor !== undefined) {
+      connector.vendor = data.vendor;
+    }
+    if (data.type !== undefined) {
+      connector.type = data.type;
+    }
+    if (data.protocol !== undefined) {
+      connector.protocol = data.protocol;
+    }
+    if (data.authType !== undefined) {
+      connector.authType = data.authType;
+    }
+    if (data.capabilities !== undefined) {
+      connector.capabilities = [...data.capabilities];
+    }
+    if (data.supportedEntities !== undefined) {
+      connector.supportedEntities = [...data.supportedEntities];
+    }
+    if (data.configuration !== undefined) {
+      connector.configuration = { ...data.configuration };
+    }
+    if (data.status !== undefined) {
+      connector.status = data.status;
+    }
+    if (data.lastSyncedAt !== undefined) {
+      connector.lastSyncedAt = data.lastSyncedAt;
+    }
+    connector.updatedAt = now();
+    logOperation('integrationConnector', 'update', { id: connector.id });
+    return {
+      ...connector,
+      capabilities: [...connector.capabilities],
+      supportedEntities: [...connector.supportedEntities],
+      configuration: { ...connector.configuration },
+    };
+  }
+}
+
+class ConnectorSyncRunModel {
+  async findMany(params?: { where?: { connectorId?: number } }): Promise<ConnectorSyncRun[]> {
+    const { where } = params ?? {};
+    return state.connectorSyncRuns
+      .filter((run) => (where?.connectorId ? run.connectorId === where.connectorId : true))
+      .map((run) => ({ ...run }));
+  }
+
+  async create(params: {
+    data: {
+      connectorId: number;
+      startedAt: Date;
+      finishedAt: Date;
+      status: SyncStatus;
+      recordsPulled: number;
+      errorMessage?: string | null;
+      datasetId?: number | null;
+    };
+  }): Promise<ConnectorSyncRun> {
+    const run: ConnectorSyncRun = {
+      id: nextId('connectorSyncRuns'),
+      connectorId: params.data.connectorId,
+      startedAt: params.data.startedAt,
+      finishedAt: params.data.finishedAt,
+      status: params.data.status,
+      recordsPulled: params.data.recordsPulled,
+      errorMessage: params.data.errorMessage ?? null,
+      datasetId: params.data.datasetId ?? null,
+    };
+    state.connectorSyncRuns.push(run);
+    logOperation('connectorSyncRun', 'create', { id: run.id, connectorId: run.connectorId });
+    return { ...run };
+  }
+}
+
+class BiDatasetModel {
+  async findMany(params?: { where?: { connectorId?: number; format?: BiDatasetFormat } }): Promise<BiDataset[]> {
+    const { where } = params ?? {};
+    return state.biDatasets
+      .filter((dataset) => (where?.connectorId ? dataset.connectorId === where.connectorId : true))
+      .filter((dataset) => (where?.format ? dataset.format === where.format : true))
+      .map((dataset) => ({
+        ...dataset,
+        content: { ...dataset.content },
+      }));
+  }
+
+  async findUnique(params: { where: { id: number } }): Promise<BiDataset | null> {
+    const dataset = state.biDatasets.find((item) => item.id === params.where.id);
+    return dataset ? { ...dataset, content: { ...dataset.content } } : null;
+  }
+
+  async create(params: {
+    data: {
+      connectorId: number;
+      name: string;
+      format: BiDatasetFormat;
+      schemaVersion: string;
+      content: Record<string, unknown>;
+      createdAt?: Date;
+    };
+  }): Promise<BiDataset> {
+    const dataset: BiDataset = {
+      id: nextId('biDatasets'),
+      connectorId: params.data.connectorId,
+      name: params.data.name,
+      format: params.data.format,
+      schemaVersion: params.data.schemaVersion,
+      content: { ...params.data.content },
+      createdAt: params.data.createdAt ?? now(),
+    };
+    state.biDatasets.push(dataset);
+    logOperation('biDataset', 'create', { id: dataset.id, connectorId: dataset.connectorId });
+    return { ...dataset, content: { ...dataset.content } };
+  }
+}
+
 class AuditLogModel {
   async create(params: { data: { userId: number | null; action: string; metadata?: Record<string, unknown> | null } }): Promise<AuditLog> {
     const logEntry: AuditLog = {
@@ -2033,6 +2752,12 @@ export class PrismaClient {
   billingScheduleItem = new BillingScheduleItemModel();
   projectDocument = new ProjectDocumentModel();
   projectDocumentVersion = new ProjectDocumentVersionModel();
+  template = new TemplateModel();
+  templateVersion = new TemplateVersionModel();
+  templateUsage = new TemplateUsageModel();
+  integrationConnector = new IntegrationConnectorModel();
+  connectorSyncRun = new ConnectorSyncRunModel();
+  biDataset = new BiDatasetModel();
 
   async $transaction<T>(callback: (tx: PrismaClient) => Promise<T>): Promise<T> {
     return callback(this);
