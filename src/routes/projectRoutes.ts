@@ -34,6 +34,15 @@ import {
   transitionDocumentStatus,
   updateProjectDocument,
 } from '@/services/documentService';
+import { getProjectStaffingSummary } from '@/services/staffingService';
+import {
+  createBillingScheduleItem,
+  exportBillingSchedule,
+  getProjectFinancialSummary,
+  listBillingSchedule,
+  updateBillingConfig,
+  updateBillingScheduleItem,
+} from '@/services/financialService';
 
 const router = Router();
 
@@ -761,6 +770,174 @@ router.patch('/:id/approvals/:approvalId', async (req: AuthenticatedRequest, res
         return res.status(403).json({ message: error.message });
       }
       if (error.message === 'Approval not found') {
+        return res.status(404).json({ message: error.message });
+      }
+      return res.status(400).json({ message: error.message });
+    }
+    return res.status(500).json({ message: 'Unexpected error' });
+  }
+});
+
+router.get('/:id/staffing', async (req: AuthenticatedRequest, res) => {
+  try {
+    const projectId = parseNumericId(req.params.id);
+    const summary = await getProjectStaffingSummary(projectId, req.user!);
+    return res.json(summary);
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Invalid identifier') {
+      return res.status(400).json({ message: 'Invalid project id' });
+    }
+    if (error instanceof Error) {
+      if (error.message === 'Insufficient permissions') {
+        return res.status(403).json({ message: error.message });
+      }
+      if (error.message === 'Project not found') {
+        return res.status(404).json({ message: error.message });
+      }
+      return res.status(400).json({ message: error.message });
+    }
+    return res.status(500).json({ message: 'Unexpected error' });
+  }
+});
+
+router.get('/:id/financials', async (req: AuthenticatedRequest, res) => {
+  try {
+    const projectId = parseNumericId(req.params.id);
+    const summary = await getProjectFinancialSummary(projectId, req.user!);
+    return res.json(summary);
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Invalid identifier') {
+      return res.status(400).json({ message: 'Invalid project id' });
+    }
+    if (error instanceof Error) {
+      if (error.message === 'Insufficient permissions') {
+        return res.status(403).json({ message: error.message });
+      }
+      if (error.message === 'Project not found') {
+        return res.status(404).json({ message: error.message });
+      }
+      return res.status(400).json({ message: error.message });
+    }
+    return res.status(500).json({ message: 'Unexpected error' });
+  }
+});
+
+router.put('/:id/billing/config', async (req: AuthenticatedRequest, res) => {
+  try {
+    const projectId = parseNumericId(req.params.id);
+    const config = await updateBillingConfig(projectId, req.body, req.user!);
+    return res.json(config);
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Invalid identifier') {
+      return res.status(400).json({ message: 'Invalid project id' });
+    }
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ message: 'Invalid payload', issues: error.flatten() });
+    }
+    if (error instanceof Error) {
+      if (error.message === 'Insufficient permissions') {
+        return res.status(403).json({ message: error.message });
+      }
+      if (error.message === 'Project not found') {
+        return res.status(404).json({ message: error.message });
+      }
+      return res.status(400).json({ message: error.message });
+    }
+    return res.status(500).json({ message: 'Unexpected error' });
+  }
+});
+
+router.get('/:id/billing', async (req: AuthenticatedRequest, res) => {
+  try {
+    const projectId = parseNumericId(req.params.id);
+    const payload = await listBillingSchedule(projectId, req.user!);
+    return res.json(payload);
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Invalid identifier') {
+      return res.status(400).json({ message: 'Invalid project id' });
+    }
+    if (error instanceof Error) {
+      if (error.message === 'Insufficient permissions') {
+        return res.status(403).json({ message: error.message });
+      }
+      if (error.message === 'Project not found') {
+        return res.status(404).json({ message: error.message });
+      }
+      return res.status(400).json({ message: error.message });
+    }
+    return res.status(500).json({ message: 'Unexpected error' });
+  }
+});
+
+router.post('/:id/billing/schedule', async (req: AuthenticatedRequest, res) => {
+  try {
+    const projectId = parseNumericId(req.params.id);
+    const created = await createBillingScheduleItem(projectId, req.body, req.user!);
+    return res.status(201).json(created);
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Invalid identifier') {
+      return res.status(400).json({ message: 'Invalid project id' });
+    }
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ message: 'Invalid payload', issues: error.flatten() });
+    }
+    if (error instanceof Error) {
+      if (error.message === 'Insufficient permissions') {
+        return res.status(403).json({ message: error.message });
+      }
+      if (error.message === 'Project not found') {
+        return res.status(404).json({ message: error.message });
+      }
+      return res.status(400).json({ message: error.message });
+    }
+    return res.status(500).json({ message: 'Unexpected error' });
+  }
+});
+
+router.patch('/:id/billing/schedule/:itemId', async (req: AuthenticatedRequest, res) => {
+  try {
+    const projectId = parseNumericId(req.params.id);
+    const itemId = parseNumericId(req.params.itemId);
+    const updated = await updateBillingScheduleItem(projectId, itemId, req.body, req.user!);
+    return res.json(updated);
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Invalid identifier') {
+      return res.status(400).json({ message: 'Invalid identifier' });
+    }
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ message: 'Invalid payload', issues: error.flatten() });
+    }
+    if (error instanceof Error) {
+      if (error.message === 'Insufficient permissions') {
+        return res.status(403).json({ message: error.message });
+      }
+      if (error.message === 'Billing schedule item not found') {
+        return res.status(404).json({ message: error.message });
+      }
+      if (error.message === 'Project not found') {
+        return res.status(404).json({ message: error.message });
+      }
+      return res.status(400).json({ message: error.message });
+    }
+    return res.status(500).json({ message: 'Unexpected error' });
+  }
+});
+
+router.get('/:id/billing/export', async (req: AuthenticatedRequest, res) => {
+  try {
+    const projectId = parseNumericId(req.params.id);
+    const csv = await exportBillingSchedule(projectId, req.user!);
+    res.setHeader('content-type', 'text/csv; charset=utf-8');
+    return res.send(csv);
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Invalid identifier') {
+      return res.status(400).json({ message: 'Invalid project id' });
+    }
+    if (error instanceof Error) {
+      if (error.message === 'Insufficient permissions') {
+        return res.status(403).json({ message: error.message });
+      }
+      if (error.message === 'Project not found') {
         return res.status(404).json({ message: error.message });
       }
       return res.status(400).json({ message: error.message });

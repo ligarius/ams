@@ -116,6 +116,133 @@ describe('API integration', () => {
     expect(patchResponse.body.role).toBe('CLIENT');
   });
 
+  it('supports staffing analytics and financial controls for sprint 7', async () => {
+    const { accessToken } = await loginAdmin();
+
+    const companyResponse = await request(app)
+      .post('/api/companies')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ name: 'Sprint7 Industries' });
+    expect(companyResponse.status).toBe(201);
+
+    const projectResponse = await request(app)
+      .post('/api/projects')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ companyId: companyResponse.body.id, name: 'Utilization Dashboard' });
+    expect(projectResponse.status).toBe(201);
+    const projectId = projectResponse.body.id;
+
+    const consultantResponse = await request(app)
+      .post('/api/staffing/consultants')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        name: 'Laura Méndez',
+        email: 'laura.mendez@example.com',
+        title: 'Senior Consultant',
+        seniority: 'SENIOR',
+        practiceArea: 'Cybersecurity',
+        skills: ['ISO 27001', 'Cloud Security'],
+        costRate: 80,
+        billableRate: 160,
+        weeklyCapacity: 40,
+      });
+    expect(consultantResponse.status).toBe(201);
+
+    const assignmentResponse = await request(app)
+      .post('/api/staffing/assignments')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        consultantId: consultantResponse.body.id,
+        projectId,
+        startDate: '2024-01-01',
+        endDate: '2024-02-11',
+        allocation: 0.5,
+        hoursPerWeek: 20,
+        billable: true,
+      });
+    expect(assignmentResponse.status).toBe(201);
+
+    const consultantsList = await request(app)
+      .get('/api/staffing/consultants')
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(consultantsList.status).toBe(200);
+    const staffingProfile = consultantsList.body.find((entry: { email: string }) => entry.email === 'laura.mendez@example.com');
+    expect(staffingProfile).toBeDefined();
+    expect(staffingProfile.utilization.allocatedHours).toBe(20);
+    expect(staffingProfile.utilization.utilization).toBeCloseTo(0.5, 2);
+
+    const staffingSummary = await request(app)
+      .get(`/api/projects/${projectId}/staffing`)
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(staffingSummary.status).toBe(200);
+    expect(staffingSummary.body.totals.plannedHours).toBe(120);
+    expect(staffingSummary.body.totals.cost).toBe(9600);
+    expect(staffingSummary.body.totals.revenue).toBe(19200);
+    expect(staffingSummary.body.totals.marginPercent).toBeCloseTo(50, 2);
+
+    const billingConfig = await request(app)
+      .put(`/api/projects/${projectId}/billing/config`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ billingModel: 'MILESTONE', currency: 'USD', paymentTerms: 'Net 30' });
+    expect(billingConfig.status).toBe(200);
+    expect(billingConfig.body.billingModel).toBe('MILESTONE');
+
+    const milestoneOne = await request(app)
+      .post(`/api/projects/${projectId}/billing/schedule`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        type: 'MILESTONE',
+        name: 'Kickoff Invoice',
+        dueDate: '2024-01-15',
+        amount: 20000,
+        currency: 'USD',
+        status: 'PLANNED',
+      });
+    expect(milestoneOne.status).toBe(201);
+
+    const milestoneTwo = await request(app)
+      .post(`/api/projects/${projectId}/billing/schedule`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        type: 'MILESTONE',
+        name: 'Operational Sprint',
+        dueDate: '2024-02-15',
+        amount: 15000,
+        currency: 'USD',
+        status: 'INVOICED',
+      });
+    expect(milestoneTwo.status).toBe(201);
+
+    const billingOverview = await request(app)
+      .get(`/api/projects/${projectId}/billing`)
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(billingOverview.status).toBe(200);
+    expect(billingOverview.body.summary.totalAmount).toBe(35000);
+    expect(billingOverview.body.summary.plannedAmount).toBe(20000);
+    expect(billingOverview.body.summary.invoicedAmount).toBe(15000);
+
+    const financials = await request(app)
+      .get(`/api/projects/${projectId}/financials`)
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(financials.status).toBe(200);
+    expect(financials.body.economics.marginPercent).toBeCloseTo(50, 2);
+    expect(financials.body.billing.schedule).toHaveLength(2);
+
+    const exportResponse = await request(app)
+      .get(`/api/projects/${projectId}/billing/export`)
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(exportResponse.status).toBe(200);
+    expect(exportResponse.headers['content-type']).toContain('text/csv');
+    expect(exportResponse.text).toContain('Kickoff Invoice');
+
+    const assignmentList = await request(app)
+      .get(`/api/staffing/assignments?projectId=${projectId}`)
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(assignmentList.status).toBe(200);
+    expect(assignmentList.body).toHaveLength(1);
+    expect(assignmentList.body[0].hoursPerWeek).toBe(20);
+  });
+
   it('allows admin to manage companies with audit logging and headers', async () => {
     const { accessToken } = await loginAdmin();
 
