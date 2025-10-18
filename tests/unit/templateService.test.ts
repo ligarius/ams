@@ -51,6 +51,8 @@ describe('templateService', () => {
     const searchResults = await searchTemplates({ q: 'controles SOX' }, admin);
     expect(searchResults.find((hit) => hit.id === template.id)).toBeDefined();
 
+    await expect(searchTemplates({ limit: '5' }, admin)).resolves.toBeInstanceOf(Array);
+
     const newVersion = await createTemplateVersion(
       template.id,
       {
