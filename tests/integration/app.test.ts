@@ -155,12 +155,35 @@ describe('API integration', () => {
         consultantId: consultantResponse.body.id,
         projectId,
         startDate: '2024-01-01',
-        endDate: '2024-02-11',
+        endDate: null,
         allocation: 0.5,
         hoursPerWeek: 20,
         billable: true,
       });
     expect(assignmentResponse.status).toBe(201);
+
+    const staffingSummary = await request(app)
+      .get(`/api/projects/${projectId}/staffing`)
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(staffingSummary.status).toBe(200);
+    expect(staffingSummary.body.totals.plannedHours).toBe(80);
+    expect(staffingSummary.body.totals.cost).toBe(6400);
+    expect(staffingSummary.body.totals.revenue).toBe(12800);
+    expect(staffingSummary.body.totals.marginPercent).toBeCloseTo(50, 2);
+
+    const historicalAssignment = await request(app)
+      .post('/api/staffing/assignments')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        consultantId: consultantResponse.body.id,
+        projectId,
+        startDate: '2023-01-01',
+        endDate: '2023-03-01',
+        allocation: 0.25,
+        hoursPerWeek: 10,
+        billable: true,
+      });
+    expect(historicalAssignment.status).toBe(201);
 
     const consultantsList = await request(app)
       .get('/api/staffing/consultants')
@@ -168,17 +191,10 @@ describe('API integration', () => {
     expect(consultantsList.status).toBe(200);
     const staffingProfile = consultantsList.body.find((entry: { email: string }) => entry.email === 'laura.mendez@example.com');
     expect(staffingProfile).toBeDefined();
+    expect(staffingProfile.utilization.assignments).toHaveLength(2);
     expect(staffingProfile.utilization.allocatedHours).toBe(20);
+    expect(staffingProfile.utilization.billableHours).toBe(20);
     expect(staffingProfile.utilization.utilization).toBeCloseTo(0.5, 2);
-
-    const staffingSummary = await request(app)
-      .get(`/api/projects/${projectId}/staffing`)
-      .set('Authorization', `Bearer ${accessToken}`);
-    expect(staffingSummary.status).toBe(200);
-    expect(staffingSummary.body.totals.plannedHours).toBe(120);
-    expect(staffingSummary.body.totals.cost).toBe(9600);
-    expect(staffingSummary.body.totals.revenue).toBe(19200);
-    expect(staffingSummary.body.totals.marginPercent).toBeCloseTo(50, 2);
 
     const billingConfig = await request(app)
       .put(`/api/projects/${projectId}/billing/config`)
@@ -239,8 +255,9 @@ describe('API integration', () => {
       .get(`/api/staffing/assignments?projectId=${projectId}`)
       .set('Authorization', `Bearer ${accessToken}`);
     expect(assignmentList.status).toBe(200);
-    expect(assignmentList.body).toHaveLength(1);
-    expect(assignmentList.body[0].hoursPerWeek).toBe(20);
+    expect(assignmentList.body).toHaveLength(2);
+    const assignmentHours = assignmentList.body.map((entry: { hoursPerWeek: number }) => entry.hoursPerWeek).sort();
+    expect(assignmentHours).toEqual([10, 20]);
   });
 
   it('allows admin to manage companies with audit logging and headers', async () => {

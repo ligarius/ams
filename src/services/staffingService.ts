@@ -91,8 +91,12 @@ const formatConsultantResponse = (
   }>
 ) => {
   const capacity = consultant.weeklyCapacity;
-  const allocatedHours = assignments.reduce((total, entry) => total + entry.assignment.hoursPerWeek, 0);
-  const billableHours = assignments
+  const activeAssignments = assignments.filter((entry) => entry.isActive);
+  const allocatedHours = activeAssignments.reduce(
+    (total, entry) => total + entry.assignment.hoursPerWeek,
+    0,
+  );
+  const billableHours = activeAssignments
     .filter((entry) => entry.assignment.billable)
     .reduce((total, entry) => total + entry.assignment.hoursPerWeek, 0);
   const utilization = capacity > 0 ? Number((allocatedHours / capacity).toFixed(2)) : 0;
