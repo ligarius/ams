@@ -584,48 +584,7 @@ export default async function ProjectOverviewPage({ params }: PageProps) {
       </Paper>
 
       <Grid container spacing={3}>
-        <Grid item xs={12} lg={6}>
-          <Paper variant="outlined" sx={{ p: 3.5, height: '100%' }}>
-            <Stack spacing={3} height="100%">
-              <Typography variant="h6">Checklist pendientes</Typography>
-              {overview.pendingChecklists.length === 0 ? (
-                <Typography variant="body2" color="text.secondary">
-                  ¡Buen trabajo! No hay checklist pendientes. Cualquier nueva tarea que se programe aparecerá aquí ordenada por
-                  fecha de vencimiento.
-                </Typography>
-              ) : (
-                <List disablePadding>
-                  {overview.pendingChecklists.map((item, index) => {
-                    const parsed = parseChecklistName(item.name);
-                    return (
-                      <Fragment key={item.id}>
-                        {index > 0 && <Divider component="li" sx={{ my: 1.5 }} />}
-                        <ListItem alignItems="flex-start" disableGutters sx={{ py: 1.5 }}>
-                          <Stack spacing={1} sx={{ flexGrow: 1, pr: 2 }}>
-                            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-                              <Typography variant="body2" fontWeight={600} component="span">
-                                {parsed.label}
-                              </Typography>
-                              {parsed.framework && (
-                                <Chip label={parsed.framework} size="small" variant="outlined" color="primary" />
-                              )}
-                            </Stack>
-                            <Typography variant="caption" color="text.secondary">
-                              {formatChecklistDueDate(item.dueDate)}
-                            </Typography>
-                          </Stack>
-                          <Chip label={checklistStatusLabel[item.status]} size="small" color="warning" variant="outlined" />
-                        </ListItem>
-                      </Fragment>
-                    );
-                  })}
-                </List>
-              )}
-            </Stack>
-          </Paper>
-        </Grid>
-
-        <Grid item xs={12} lg={6}>
+        <Grid item xs={12}>
           <Paper variant="outlined" sx={{ p: 3.5, height: '100%' }}>
             <Stack spacing={3} height="100%">
               <Typography variant="h6">Riesgos prioritarios</Typography>
@@ -819,6 +778,47 @@ export default async function ProjectOverviewPage({ params }: PageProps) {
                   </Box>
                 </Box>
               </Stack>
+            </Stack>
+          </Paper>
+        </Grid>
+
+        <Grid item xs={12}>
+          <Paper variant="outlined" sx={{ p: 3.5, height: '100%' }}>
+            <Stack spacing={3} height="100%">
+              <Typography variant="h6">Checklist pendientes</Typography>
+              {overview.pendingChecklists.length === 0 ? (
+                <Typography variant="body2" color="text.secondary">
+                  ¡Buen trabajo! No hay checklist pendientes. Cualquier nueva tarea que se programe aparecerá aquí ordenada por
+                  fecha de vencimiento.
+                </Typography>
+              ) : (
+                <List disablePadding>
+                  {overview.pendingChecklists.map((item, index) => {
+                    const parsed = parseChecklistName(item.name);
+                    return (
+                      <Fragment key={item.id}>
+                        {index > 0 && <Divider component="li" sx={{ my: 1.5 }} />}
+                        <ListItem alignItems="flex-start" disableGutters sx={{ py: 1.5 }}>
+                          <Stack spacing={1} sx={{ flexGrow: 1, pr: 2 }}>
+                            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                              <Typography variant="body2" fontWeight={600} component="span">
+                                {parsed.label}
+                              </Typography>
+                              {parsed.framework && (
+                                <Chip label={parsed.framework} size="small" variant="outlined" color="primary" />
+                              )}
+                            </Stack>
+                            <Typography variant="caption" color="text.secondary">
+                              {formatChecklistDueDate(item.dueDate)}
+                            </Typography>
+                          </Stack>
+                          <Chip label={checklistStatusLabel[item.status]} size="small" color="warning" variant="outlined" />
+                        </ListItem>
+                      </Fragment>
+                    );
+                  })}
+                </List>
+              )}
             </Stack>
           </Paper>
         </Grid>
