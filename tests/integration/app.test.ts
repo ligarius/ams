@@ -260,6 +260,144 @@ describe('API integration', () => {
     expect(assignmentHours).toEqual([10, 20]);
   });
 
+  it('delivers benchmarking analytics and collects feedback for sprint 9', async () => {
+    const { accessToken } = await loginAdmin();
+
+    const projectResponse = await request(app)
+      .post('/api/projects')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ companyId: 1, name: 'Benchmark Sprint 9', wizard: {} });
+    expect(projectResponse.status).toBe(201);
+    const projectId = projectResponse.body.id;
+
+    const riskResponse = await request(app)
+      .post(`/api/projects/${projectId}/risks`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        title: 'Riesgo de cumplimiento SOX',
+        description: 'Falta de evidencia actualizada en controles clave.',
+        likelihood: 'HIGH',
+        severity: 'HIGH',
+        urgency: 'MEDIUM',
+        complexity: 'MEDIUM',
+      });
+    expect(riskResponse.status).toBe(201);
+    const riskId = riskResponse.body.id;
+
+    const dataRequestResponse = await request(app)
+      .post(`/api/projects/${projectId}/data-requests`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        title: 'Estados financieros actualizados',
+        description: 'Necesarios para validar conciliaciones.',
+        dueDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 5).toISOString(),
+      });
+    expect(dataRequestResponse.status).toBe(201);
+    const dataRequestId = dataRequestResponse.body.id;
+
+    const dataRequestReview = await request(app)
+      .patch(`/api/projects/${projectId}/data-requests/${dataRequestId}`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ status: 'IN_REVIEW' });
+    expect(dataRequestReview.status).toBe(200);
+
+    const dataRequestApproval = await request(app)
+      .patch(`/api/projects/${projectId}/data-requests/${dataRequestId}`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ status: 'APPROVED' });
+    expect(dataRequestApproval.status).toBe(200);
+
+    const findingResponse = await request(app)
+      .post(`/api/projects/${projectId}/findings`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ riskId, title: 'Hallazgo sin plan de remediación' });
+    expect(findingResponse.status).toBe(201);
+    const findingId = findingResponse.body.id;
+
+    const findingClosure = await request(app)
+      .patch(`/api/projects/${projectId}/findings/${findingId}`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ status: 'RESOLVED' });
+    expect(findingClosure.status).toBe(200);
+
+    const templatesResponse = await request(app)
+      .get('/api/templates')
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(templatesResponse.status).toBe(200);
+    const templateId = templatesResponse.body[0].id;
+    const usageResponse = await request(app)
+      .post(`/api/templates/${templateId}/usage`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ projectId, rating: 4, notes: 'Útil para estructurar el plan de mitigación' });
+    expect(usageResponse.status).toBe(201);
+
+    const consultantResponse = await request(app)
+      .post('/api/staffing/consultants')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        name: 'Rodrigo Torres',
+        email: 'rodrigo.torres@example.com',
+        title: 'Engagement Manager',
+        seniority: 'MANAGER',
+        practiceArea: 'Financial Controls',
+        skills: ['SOX', 'COSO'],
+        costRate: 120,
+        billableRate: 240,
+        weeklyCapacity: 40,
+      });
+    expect(consultantResponse.status).toBe(201);
+
+    const assignmentResponse = await request(app)
+      .post('/api/staffing/assignments')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        consultantId: consultantResponse.body.id,
+        projectId,
+        startDate: new Date().toISOString(),
+        endDate: null,
+        allocation: 0.5,
+        hoursPerWeek: 20,
+        billable: true,
+      });
+    expect(assignmentResponse.status).toBe(201);
+
+    const syncResponse = await request(app)
+      .post('/api/integrations/connectors/salesforce-crm/sync')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({});
+    expect(syncResponse.status).toBe(202);
+
+    const benchmarkResponse = await request(app)
+      .get(`/api/projects/${projectId}/benchmark`)
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(benchmarkResponse.status).toBe(200);
+    expect(benchmarkResponse.body.metrics.riskScore).toBeGreaterThanOrEqual(0);
+    expect(Array.isArray(benchmarkResponse.body.insights)).toBe(true);
+    expect(benchmarkResponse.body.snapshotId).toBeDefined();
+
+    const snapshotsResponse = await request(app)
+      .get(`/api/projects/${projectId}/benchmark/snapshots`)
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(snapshotsResponse.status).toBe(200);
+    expect(Array.isArray(snapshotsResponse.body)).toBe(true);
+    expect(snapshotsResponse.body.length).toBeGreaterThan(0);
+    expect(typeof snapshotsResponse.body[0].generatedAt).toBe('string');
+
+    const feedbackResponse = await request(app)
+      .post(`/api/projects/${projectId}/benchmark/feedback`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ usefulness: 5, confidence: 4, comment: 'Insights accionables y claros' });
+    expect(feedbackResponse.status).toBe(201);
+    expect(feedbackResponse.body.usefulness).toBe(5);
+    expect(typeof feedbackResponse.body.submittedAt).toBe('string');
+
+    const invalidFeedback = await request(app)
+      .post(`/api/projects/${projectId}/benchmark/feedback`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ usefulness: 0, confidence: 3 });
+    expect(invalidFeedback.status).toBe(400);
+  });
+
   it('allows admin to manage companies with audit logging and headers', async () => {
     const { accessToken } = await loginAdmin();
 
