@@ -65,6 +65,11 @@ Este documento concentra la historia funcional y técnica del backend de Auditor
 - Persistencia in-memory de snapshots y feedback auditado (utilidad/confianza 1-5) con `submittedAt`.
 - Suites unitarias/integradas que recorren generación de benchmark, recuperación de snapshots y validación de feedback.
 
+### Sprint 10 — Inteligencia Predictiva de Portafolio
+- Tendencias de benchmark con analítica de momentum que consolidan snapshots en `/api/projects/:id/benchmark/trends`.
+- Tablero de ranking multi-proyecto en `/api/projects/benchmark/leaderboard` con métricas configurables y controles de permisos.
+- Pruebas unitarias e integrales para validar cálculos de tendencias, restricciones de acceso y rutas expuestas.
+
 ## 4. Estado Actual y Salud del Repositorio
 - Backend y frontend Next.js operativos; seeds crean `Acme Corp`, `Acme Consulting` y usuario admin (`admin@example.com / Admin123!`).
 - Cobertura de pruebas mantenida mediante `npm run accept` (lint + typecheck + test) y reportes `coverage/` y `playwright-report/` listos para CI.
