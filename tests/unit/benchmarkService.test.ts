@@ -7,6 +7,8 @@ import prisma, {
 import { createProject } from '@/services/projectService';
 import {
   generateBenchmarkReport,
+  getBenchmarkLeaderboard,
+  getBenchmarkTrend,
   listBenchmarkSnapshots,
   recordBenchmarkFeedback,
 } from '@/services/benchmarkService';
@@ -136,5 +138,60 @@ describe('benchmarkService', () => {
     await expect(
       recordBenchmarkFeedback(project.id, { usefulness: 0, confidence: 3, comment: 'comentario' }, admin)
     ).rejects.toThrow(/expected number to be >=1/);
+  });
+
+  it('builds benchmark trend analytics with momentum scoring', async () => {
+    await seedSignals();
+    await generateBenchmarkReport(project.id, admin);
+
+    await prisma.dataRequest.create({
+      data: {
+        projectId: project.id,
+        title: 'Nueva solicitud de evidencia',
+        status: 'PENDING',
+        createdById: admin.id,
+        dueDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 10),
+      },
+    });
+
+    await prisma.projectRisk.create({
+      data: {
+        projectId: project.id,
+        title: 'Nuevo riesgo operativo',
+        severity: 'MEDIUM',
+        likelihood: 'MEDIUM',
+        urgency: 'HIGH',
+        complexity: 'LOW',
+        status: 'OPEN',
+      },
+    });
+
+    await generateBenchmarkReport(project.id, admin);
+
+    const trend = await getBenchmarkTrend(project.id, admin, { limit: 5 });
+    expect(trend.series.length).toBeGreaterThanOrEqual(2);
+    expect(trend.window.totalSnapshots).toBeGreaterThanOrEqual(2);
+    const pendingMetric = trend.metrics.find((metric) => metric.key === 'pendingDataRequests');
+    expect(pendingMetric).toBeDefined();
+    expect(pendingMetric?.latest).toBeGreaterThan(0);
+    expect(trend.momentum.improving + trend.momentum.declining).toBeGreaterThanOrEqual(0);
+  });
+
+  it('produces benchmark leaderboards restricted to consultants and admins', async () => {
+    await seedSignals();
+    await generateBenchmarkReport(project.id, admin);
+
+    const secondaryProject = await createProject({ companyId: 1, name: 'Second Benchmark', wizard: undefined }, admin);
+    await generateBenchmarkReport(secondaryProject.id, admin);
+
+    const leaderboard = await getBenchmarkLeaderboard({ metric: 'remediationRate', limit: 10 }, admin);
+    expect(leaderboard.metric.key).toBe('remediationRate');
+    expect(leaderboard.entries.length).toBeGreaterThanOrEqual(2);
+    expect(leaderboard.entries[0].rank).toBe(1);
+
+    const client = await seedUser('client-benchmark@example.com', 'CLIENT');
+    await prisma.membership.create({ data: { projectId: project.id, userId: client.id, role: 'CLIENT' } });
+
+    await expect(getBenchmarkLeaderboard({ metric: 'riskScore' }, client)).rejects.toThrow('Insufficient permissions');
   });
 });

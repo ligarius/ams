@@ -48,6 +48,8 @@ import {
   generateBenchmarkReport,
   listBenchmarkSnapshots,
   recordBenchmarkFeedback,
+  getBenchmarkLeaderboard,
+  getBenchmarkTrend,
 } from '@/services/benchmarkService';
 
 const router = Router();
@@ -100,6 +102,27 @@ router.get('/wizard/config', (req: AuthenticatedRequest, res) => {
   }
   const config = getProjectWizardConfig();
   return res.json(config);
+});
+
+router.get('/benchmark/leaderboard', async (req: AuthenticatedRequest, res) => {
+  try {
+    const leaderboard = await getBenchmarkLeaderboard(req.query, req.user!);
+    return res.json(leaderboard);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ message: 'Invalid filters', issues: error.flatten() });
+    }
+    if (error instanceof Error) {
+      if (error.message === 'Insufficient permissions' || error.message === 'Unauthorized') {
+        return res.status(403).json({ message: 'Insufficient permissions' });
+      }
+      if (error.message === 'No benchmark data available') {
+        return res.status(404).json({ message: error.message });
+      }
+      return res.status(400).json({ message: error.message });
+    }
+    return res.status(500).json({ message: 'Unexpected error' });
+  }
 });
 
 router.get('/:id/overview', async (req: AuthenticatedRequest, res) => {
@@ -161,6 +184,43 @@ router.get('/:id/benchmark', async (req: AuthenticatedRequest, res) => {
       }
       if (error.message === 'Insufficient permissions') {
         return res.status(403).json({ message: error.message });
+      }
+      return res.status(400).json({ message: error.message });
+    }
+    return res.status(500).json({ message: 'Unexpected error' });
+  }
+});
+
+router.get('/:id/benchmark/trends', async (req: AuthenticatedRequest, res) => {
+  try {
+    const projectId = Number(req.params.id);
+    if (Number.isNaN(projectId)) {
+      return res.status(400).json({ message: 'Invalid project id' });
+    }
+    const limitParam = req.query.limit;
+    let options: { limit: number } | undefined;
+    if (limitParam !== undefined) {
+      const limit = Number(limitParam);
+      if (Number.isNaN(limit)) {
+        return res.status(400).json({ message: 'Invalid limit parameter' });
+      }
+      options = { limit };
+    }
+    const trend = await getBenchmarkTrend(projectId, req.user!, options);
+    return res.json(trend);
+  } catch (error) {
+    if (error instanceof Error) {
+      if (error.message === 'Project not found') {
+        return res.status(404).json({ message: error.message });
+      }
+      if (error.message === 'Insufficient permissions') {
+        return res.status(403).json({ message: error.message });
+      }
+      if (error.message === 'No benchmark data available') {
+        return res.status(404).json({ message: error.message });
+      }
+      if (error.message === 'Invalid identifier') {
+        return res.status(400).json({ message: error.message });
       }
       return res.status(400).json({ message: error.message });
     }
